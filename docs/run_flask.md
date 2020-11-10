@@ -25,4 +25,10 @@ You can install flask module using
 pip install flask
 ```
 
+Run your flask
+
+```sh
+python Register_login/app.py
+```
+
 **NEED TO CHECK: pip install -r requirement.txt**
