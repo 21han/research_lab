@@ -1,7 +1,11 @@
 # How to run this flask app
 
 ## Create python environment
+
+
 ```sh
+# research_lab/
+
 python -m venv env
 source env/bin/activate
 ```
@@ -28,6 +32,7 @@ pip install flask
 Run your flask
 
 ```sh
+# research_lab/
 python Register_login/app.py
 ```
 
