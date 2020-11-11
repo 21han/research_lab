@@ -7,5 +7,11 @@
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/alchemist.db</jdbc-url>
     </data-source>
+    <data-source source="LOCAL" name="user.db" uuid="6772334b-c23b-4b6f-ac76-517e114a84bc">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/user.db</jdbc-url>
+    </data-source>
   </component>
 </project>
