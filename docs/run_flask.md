@@ -1,39 +1,18 @@
-# How to run this flask app
-
-## Create python environment
+# Create conda environment to run this app
 
 
+
+Create conda environment: ResearchLab
 ```sh
 # research_lab/
-
-python -m venv env
-source env/bin/activate
+conda env create -f env.yml
 ```
-
-You can verify your python by running
+Activate created conda environment
 ```sh
-which python
+conda activate ResearchLab
 ```
-Your terminal should should show as the following 
+
+Run your flask app
 ```sh
-/Users/.../research_lab/env/bin/python
+python app.py
 ```
-
-Make sure your pip is upgraded to the latest one
-```sh
-pip install --upgrade pip
-```
-
-You can install flask module using
-```sh
-pip install flask
-```
-
-Run your flask
-
-```sh
-# research_lab/
-python Register_login/app.py
-```
-
-**NEED TO CHECK: pip install -r requirement.txt**
