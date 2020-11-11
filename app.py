@@ -1,13 +1,9 @@
-"""
-
-"""
 from flask import Flask, redirect, url_for, request, flash, render_template, session
 from flask import render_template
 import sqlite3
 from flask import request
 import logging
 import pandas as pd
-
 import os
 import secrets
 from PIL import Image
@@ -18,9 +14,6 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
-
-from datetime import datetime, timedelta
-# from flask_jwt import JWT, jwt_required, current_identity
 # from authlib.integrations.flask_client import OAuth
 
 logging.basicConfig(level=logging.DEBUG)
@@ -28,11 +21,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
-
-app.config['SECRET_KEY'] = '5791628bb0b13ce0c676dfde280ba245'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///alchemist.db'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///user.db'
-
+app.config.from_object("config")
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
@@ -40,75 +29,26 @@ login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
 
-# @app.route('/')
-# def hello_world():
-#     return 'Hello, World!'
 
-
-def get_user_strategies(user_id):
-    conn = sqlite3.connect("alchemist.db")
-    strategies = pd.read_sql(f"select * from strategies where user_id = {user_id};", conn)
-    return strategies
-
-
-@app.route('/strategies')
-def all_strategy():
-    # TODO remove hard code of user after integration with Michael
-    current_user_id = 0
-    all_user_strategies = get_user_strategies(current_user_id)
-
-    # display all user strategy as a table on the U.I.
-    return render_template('strategies.html', df=all_user_strategies)
-
-
-def get_strategy_location(strategy_id):
-    conn = sqlite3.connect("alchemist.db")
-    strategies = pd.read_sql(
-        f"select * from strategies where strategy_id = {strategy_id};",
-        conn
-    )
-    s_loc = strategies['strategy_location'].iloc[0]
-    logger.info(f"[db] - {s_loc}")
-    return s_loc
-
-
-@app.route('/strategy')
-def display_strategy():
-    strategy_id = request.args.get('id')
-    strategy_location = get_strategy_location(strategy_id)
-    with open(f"strategies/{strategy_location}/src/main.py") as f:
-        code_snippet = f.read()
-    return render_template('strategy.html', code=code_snippet)
-
+# endpoint routes
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# @app.route("/")
-# @app.route("/login", methods=['GET', 'POST'])
-# def login():
-#     if current_user.is_authenticated:
-#         return redirect(url_for('home'))
-#     form = LoginForm()
-#     if form.validate_on_submit():
-#         # admin
-#         if form.email.data == 'admin@backtesting.com' and form.password.data == 'admin':
-#             flash('Welcome boss!', 'success')
-#             return redirect(url_for('admin'))
-#
-#         user = User.query.filter_by(email=form.email.data).first()
-#         if user and bcrypt.check_password_hash(user.password, form.password.data):
-#             login_user(user, remember=form.remember.data)
-#             next_page = request.args.get('next')
-#             return redirect(next_page) if next_page else redirect(url_for('home'))
-#         else:
-#             flash('Login Unsuccessful. Please check email and password', 'danger')
-#
-#     return render_template('login.html', title='Login', form=form)
-
 @app.route("/")
+@app.route("/welcome")
+def about():
+    return render_template('welcome.html', title='About')
+
+
+@app.route("/home")
+@login_required
+def home():
+    return render_template('home.html')
+
+
 @app.route("/login", methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -118,9 +58,7 @@ def login():
         # admin
         if form.email.data == 'admin@backtesting.com' and form.password.data == 'admin':
             flash('Welcome boss!', 'success')
-            users = User.query.all()
             return redirect(url_for('admin'))
-
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password, form.password.data):
             login_user(user, remember=form.remember.data)
@@ -128,9 +66,7 @@ def login():
             return redirect(next_page) if next_page else redirect(url_for('home'))
         else:
             flash('Login Unsuccessful. Please check email and password', 'danger')
-
-    users = User.query.all()
-    return render_template('login.html', title='Login', form=form, users=users)
+    return render_template('login.html', title='Login', form=form)
 
 
 @app.route("/register", methods=['GET', 'POST'])
@@ -146,12 +82,6 @@ def register():
     return render_template('register.html', title='Register', form=form)
 
 
-@app.route("/home")
-@login_required
-def home():
-    return render_template('home.html')
-
-
 @app.route("/admin", methods=['GET', 'POST'])
 # @login_required
 def admin():
@@ -162,23 +92,6 @@ def admin():
 def logout():
     logout_user()
     return redirect(url_for('home'))
-
-
-@app.route("/about")
-def about():
-    return render_template('about.html', title='About')
-
-
-def save_picture(form_picture):
-    random_hex = secrets.token_hex(8)
-    _, f_ext = os.path.splitext(form_picture.filename)
-    picture_fn = random_hex + f_ext
-    picture_path = os.path.join(app.root_path, 'static/profile_pics', picture_fn)
-    output_size = (125, 125)
-    i = Image.open(form_picture)
-    i.thumbnail(output_size)
-    i.save(picture_path)
-    return picture_fn
 
 
 @app.route("/account", methods=['GET', 'POST'])
@@ -201,17 +114,56 @@ def account():
     return render_template('account.html', title='Account', image_file=image_file, form=form)
 
 
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    image_file = db.Column(db.String(20), nullable=False, default='default.jpg')
-    password = db.Column(db.String(60), nullable=False)
 
-    # strategy = db.relationship('Strategy', backref='location', lazy=True)
-    def __repr__(self):
-        return f"User('{self.username}', '{self.email}', '{self.image_file}')"
+@app.route('/strategies')
+def all_strategy():
+    # TODO remove hard code of user after integration with Michael
+    current_user_id = 0
+    all_user_strategies = get_user_strategies(current_user_id)
+    # display all user strategy as a table on the U.I.
+    return render_template('strategies.html', df=all_user_strategies)
 
+
+@app.route('/strategy')
+def display_strategy():
+    strategy_id = request.args.get('id')
+    strategy_location = get_strategy_location(strategy_id)
+    with open(f"strategies/{strategy_location}/src/main.py") as f:
+        code_snippet = f.read()
+    return render_template('strategy.html', code=code_snippet)
+
+# helper functions
+
+def save_picture(form_picture):
+    random_hex = secrets.token_hex(8)
+    _, f_ext = os.path.splitext(form_picture.filename)
+    picture_fn = random_hex + f_ext
+    picture_path = os.path.join(app.root_path, 'static/profile_pics', picture_fn)
+    output_size = (125, 125)
+    i = Image.open(form_picture)
+    i.thumbnail(output_size)
+    i.save(picture_path)
+    return picture_fn
+
+
+def get_user_strategies(user_id):
+    conn = sqlite3.connect("alchemist.db")
+    strategies = pd.read_sql(f"select * from strategies where user_id = {user_id};", conn)
+    return strategies
+
+
+def get_strategy_location(strategy_id):
+    conn = sqlite3.connect("alchemist.db")
+    strategies = pd.read_sql(
+        f"select * from strategies where strategy_id = {strategy_id};",
+        conn
+    )
+    s_loc = strategies['strategy_location'].iloc[0]
+    logger.info(f"[db] - {s_loc}")
+    return s_loc
+
+
+# Forms: registration, login, account
 
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
@@ -257,18 +209,21 @@ class UpdateAccountForm(FlaskForm):
                 raise ValidationError('That email is taken. Please choose a different one.')
 
 
-# class Strategy(db.Model):
-#     id = db.Column(db.Integer, primary_key=True)
-#     location = db.Column(db.Text, nullable=False)
-#     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-#
-#     # title = db.Column(db.String(100), nullable=False)
-#     # date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-#     # content = db.Column(db.Text, nullable=False)
-#
-#     def __repr__(self):
-#         return f"Strategy('{self.id}', '{self.date_posted}' by '{self.user_id}')"
+# User object
 
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(20), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    image_file = db.Column(db.String(20), nullable=False, default='default.jpg')
+    password = db.Column(db.String(60), nullable=False)
+
+    # strategy = db.relationship('Strategy', backref='location', lazy=True)
+    def __repr__(self):
+        return f"User('{self.username}', '{self.email}', '{self.image_file}')"
+
+
+# Inplement OAuth Google
 
 # # Session config
 # app.secret_key = os.getenv("APP_SECRET_KEY")
@@ -289,19 +244,19 @@ class UpdateAccountForm(FlaskForm):
 #     userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',  # This is only needed if using openId to fetch user info
 #     client_kwargs={'scope': 'openid email profile'},
 # )
-#
+
 # @app.route('/')
 # @login_required
 # def hello_world():
 #     email = dict(session)['profile']['email']
 #     return f'Hello, you are logge in as {email}!'
-#
+
 # @app.route('/login')
 # def login():
 #     google = oauth.create_client('google')  # create the google oauth client
 #     redirect_uri = url_for('authorize', _external=True)
 #     return google.authorize_redirect(redirect_uri)
-#
+
 # @app.route('/authorize')
 # def authorize():
 #     google = oauth.create_client('google')  # create the google oauth client
@@ -314,24 +269,12 @@ class UpdateAccountForm(FlaskForm):
 #     session['profile'] = user_info
 #     session.permanent = True  # make the session permanant so it keeps existing after broweser gets closed
 #     return redirect('/')
-#
+
 # @app.route('/logout')
 # def logout():
 #     for key in list(session.keys()):
 #         session.pop(key)
 #     return redirect('/')
-
-
-# class Post(db.Model):
-#     id = db.Column(db.Integer, primary_key=True)
-#     title = db.Column(db.String(100), nullable=False)
-#     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-#     content = db.Column(db.Text, nullable=False)
-#     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-#
-#     def __repr__(self):
-#         return f"Post('{self.title}', '{self.date_posted}')"
-#
 
 
 def main():
