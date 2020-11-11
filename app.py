@@ -82,7 +82,7 @@ def register():
 
 
 @app.route("/admin", methods=['GET', 'POST'])
-# @login_required
+@login_required
 def admin():
     return render_template('admin.html')
 
@@ -219,7 +219,8 @@ class User(db.Model, UserMixin):
 
     # strategy = db.relationship('Strategy', backref='location', lazy=True)
     def __repr__(self):
-        return f"User('{self.username}', '{self.email}', '{self.image_file}')"
+        # return f"User('{self.username}', '{self.email}', '{self.image_file}')"
+        return f"User('{self.id}', '{self.username}', '{self.email}', '{self.image_file}')"
 
 
 def main():
