@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="18623be2-01b2-4ca2-a4d8-3d1c5865a2ee" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/static/main.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/static/profile_pics/default.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/about.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/account.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/admin.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/home.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/layout.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/login.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/register.html" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="CSS File" />
+        <option value="HTML File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="JupyterTrust" id="cbfe5c67-5eaf-4754-8b24-fafa10efbd33" />
+  <component name="ProjectId" id="1jqhKKyl1NlPdEVVWtiPb0kY0kA" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
+    <property name="DefaultHtmlFileTemplate" value="HTML File" />
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="list.type.of.created.stylesheet" value="CSS" />
+    <property name="node.js.detected.package.eslint" value="true" />
+    <property name="node.js.detected.package.tslint" value="true" />
+    <property name="node.js.path.for.package.eslint" value="project" />
+    <property name="node.js.path.for.package.tslint" value="project" />
+    <property name="node.js.selected.package.eslint" value="(autodetect)" />
+    <property name="node.js.selected.package.tslint" value="(autodetect)" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/templates" />
+      <recent name="$PROJECT_DIR$/static/profile_pics" />
+      <recent name="$PROJECT_DIR$/static" />
+      <recent name="$PROJECT_DIR$/register_login" />
+      <recent name="$PROJECT_DIR$/register_login/templates" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="app" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="research_lab" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/app.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.app" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="18623be2-01b2-4ca2-a4d8-3d1c5865a2ee" name="Default Changelist" comment="" />
+      <created>1604537463831</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1604537463831</updated>
+      <workItem from="1604537464894" duration="72000" />
+      <workItem from="1604538105784" duration="216000" />
+      <workItem from="1604538335199" duration="1095000" />
+      <workItem from="1604549651008" duration="115000" />
+      <workItem from="1604592414615" duration="32000" />
+      <workItem from="1605030635610" duration="358000" />
+      <workItem from="1605031011759" duration="1957000" />
+      <workItem from="1605033318638" duration="4879000" />
+      <workItem from="1605039297557" duration="1497000" />
+      <workItem from="1605041134584" duration="406000" />
+      <workItem from="1605041597432" duration="1107000" />
+      <workItem from="1605045754824" duration="1399000" />
+      <workItem from="1605047541199" duration="1242000" />
+      <workItem from="1605048866367" duration="2207000" />
+      <workItem from="1605051122921" duration="345000" />
+      <workItem from="1605051550665" duration="3040000" />
+      <workItem from="1605054678054" duration="396000" />
+      <workItem from="1605055098051" duration="10000" />
+      <workItem from="1605055133674" duration="711000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="303" y="130" width="1071" height="724" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1605042130201">
+      <screen x="0" y="23" width="1680" height="953" />
+    </state>
+    <state x="303" y="130" width="1071" height="724" key="#com.intellij.execution.impl.EditConfigurationsDialog/-1920.23.1920.1057/0.23.1680.953@0.23.1680.953" timestamp="1605042130201" />
+    <state x="303" y="130" width="1071" height="700" key="#com.intellij.execution.impl.EditConfigurationsDialog/-1920.23.1920.1057/0.23.1680.954@0.23.1680.954" timestamp="1605038291176" />
+    <state x="593" y="287" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1605036064161">
+      <screen x="0" y="23" width="1680" height="953" />
+    </state>
+    <state x="593" y="287" key="#com.intellij.fileTypes.FileTypeChooser/-1920.23.1920.1057/0.23.1680.953@0.23.1680.953" timestamp="1605036064161" />
+    <state width="1638" height="255" key="GridCell.Tab.0.bottom" timestamp="1605055092093">
+      <screen x="0" y="23" width="1680" height="953" />
+    </state>
+    <state width="1638" height="255" key="GridCell.Tab.0.bottom/-1920.23.1920.1057/0.23.1680.953@0.23.1680.953" timestamp="1605055092093" />
+    <state width="1638" height="246" key="GridCell.Tab.0.bottom/-1920.23.1920.1057/0.23.1680.954@0.23.1680.954" timestamp="1605039294581" />
+    <state width="1638" height="255" key="GridCell.Tab.0.center" timestamp="1605055092092">
+      <screen x="0" y="23" width="1680" height="953" />
+    </state>
+    <state width="1638" height="255" key="GridCell.Tab.0.center/-1920.23.1920.1057/0.23.1680.953@0.23.1680.953" timestamp="1605055092092" />
+    <state width="1638" height="246" key="GridCell.Tab.0.center/-1920.23.1920.1057/0.23.1680.954@0.23.1680.954" timestamp="1605039294580" />
+    <state width="1638" height="255" key="GridCell.Tab.0.left" timestamp="1605055092091">
+      <screen x="0" y="23" width="1680" height="953" />
+    </state>
+    <state width="1638" height="255" key="GridCell.Tab.0.left/-1920.23.1920.1057/0.23.1680.953@0.23.1680.953" timestamp="1605055092091" />
+    <state width="1638" height="246" key="GridCell.Tab.0.left/-1920.23.1920.1057/0.23.1680.954@0.23.1680.954" timestamp="1605039294580" />
+    <state width="1638" height="255" key="GridCell.Tab.0.right" timestamp="1605055092092">
+      <screen x="0" y="23" width="1680" height="953" />
+    </state>
+    <state width="1638" height="255" key="GridCell.Tab.0.right/-1920.23.1920.1057/0.23.1680.953@0.23.1680.953" timestamp="1605055092092" />
+    <state width="1638" height="246" key="GridCell.Tab.0.right/-1920.23.1920.1057/0.23.1680.954@0.23.1680.954" timestamp="1605039294581" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/research_lab$app.coverage" NAME="app Coverage Results" MODIFIED="1605054701623" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/research_lab$Unnamed.coverage" NAME="Unnamed Coverage Results" MODIFIED="1605041144875" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+  </component>
+</project>
