@@ -27,8 +27,6 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
-
-
 # endpoint routes
 
 @login_manager.user_loader
@@ -44,9 +42,35 @@ def about():
 
 @app.route("/home")
 @login_required
+# current page is login required, which means not logging will be redirected
 def home():
-    return render_template('home.html')
+    context = {"username": current_user.username}
+    return render_template('home.html', **context)
 
+@app.route("/home", methods=["POST"])
+@login_required
+def upload_strategy():
+    if "user_file" not in request.files:
+        return "No user_file is specified"
+    if "strategy_name" not in request.form:
+        return "Strategy name may not be empty"   
+    file   = request.files["user_file"]
+    name   = request.form["strategy_name"] 
+    '''
+        These attributes are also available
+
+        file.filename               # The actual name of the file
+        file.content_type
+        file.content_length
+        file.mimetype
+
+    '''
+    if file.filename == "":
+        return "Please select a file"
+
+
+    message = "Your strategy " + name + " is uploaded successfully"
+    return message
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
@@ -161,6 +185,11 @@ def get_strategy_location(strategy_id):
     logger.info(f"[db] - {s_loc}")
     return s_loc
 
+def allowed_file(filename):
+    # allowed file extenstion
+    # see config.py
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in app.config["ALLOWED_EXTENSIONS"]
 
 # Forms: registration, login, account
 
