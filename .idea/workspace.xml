@@ -27,7 +27,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ed1a61ec-091f-4670-a6db-f0ac63972988" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dash/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/dash/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -60,11 +60,15 @@
   </component>
   <component name="JupyterTrust" id="cadcda83-1379-4988-af58-27c894b1c00a" />
   <component name="ProjectId" id="1k7eNvD2Ca5yq8VikQnHHkP0YQc" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
     <property name="ASKED_SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
@@ -116,7 +120,7 @@
       <option name="presentableId" value="Default" />
       <updated>1605056022247</updated>
       <workItem from="1605056023940" duration="3648000" />
-      <workItem from="1605060073656" duration="1829000" />
+      <workItem from="1605060073656" duration="2138000" />
     </task>
     <servers />
   </component>
@@ -134,6 +138,9 @@
       </map>
     </option>
     <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
   </component>
   <component name="WindowStateProjectService">
     <state x="378" y="318" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1605057462179">

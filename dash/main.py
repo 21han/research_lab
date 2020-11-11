@@ -20,6 +20,7 @@ app.layout = html.Div()
 def update_graph(n_clicks, title):
     graph_data = []
 
+    # TODO: need to modify this.
     path = title+'.csv'
     df = pd.read_csv(path)
     graph_data.append({'x': df['date'], 'y': df['pnl']})
@@ -42,6 +43,8 @@ def update_graph(n_clicks, title):
 if __name__ == '__main__':
 
     # Create a sidebar with stock to select
+
+    # TODO: need to modify this.
     str_name_dic = {'STRG1': 'Strategy1', 'STRG2': 'Strategy2', 'STRG3': 'Strategy3'}
     options = []
     for ticker in str_name_dic:
