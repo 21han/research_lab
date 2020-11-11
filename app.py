@@ -15,6 +15,13 @@ from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
 
+from werkzeug.utils import secure_filename
+from datetime import datetime
+
+# github api
+from github import Github
+from github import InputGitTreeElement
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -26,6 +33,8 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
+git = Github(login_or_token=app.config["GITHUB_TOKEN"])
 
 # endpoint routes
 
@@ -68,6 +77,20 @@ def upload_strategy():
     if file.filename == "":
         return "Please select a file"
 
+    if not allowed_file(file.filename):
+        return "Your file extension type is not allowed"
+    
+    if not file:
+        return "File not found. Please upload it again"
+
+    file.filename = secure_filename(file.filename)
+    timestamp = str(datetime.now()).split('.')[0]
+    timestamp = '-'.join(timestamp.split(':'))
+    new_branch = '-'.join(timestamp.split()) # use time stamp to debug
+
+    filepath = branch_and_upload(file, new_branch) # folder and branch name will be the same
+    merge_branch(new_branch)
+    delete_branch(new_branch)
 
     message = "Your strategy " + name + " is uploaded successfully"
     return message
@@ -191,6 +214,42 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config["ALLOWED_EXTENSIONS"]
 
+def delete_branch(branchname):
+    repo = git.get_user().get_repo(app.config["GITHUB_REPO"])
+    # repo = git.get_user().get_repo("gzhami/research_lab")
+    
+    src = repo.get_git_ref("heads/"+branchname)
+    response = src.delete()
+    print(response)
+
+def merge_branch(branch_name, commit_message="merge after successful check", base="main"):
+    try:
+        # base = repo.get_branch(base)
+        repo = git.get_user().get_repo(app.config["GITHUB_REPO"])
+        head = repo.get_branch(branch_name)
+
+        merge_to_master = repo.merge(base,
+                            head.commit.sha, commit_message)
+        pprint(merge_to_master)
+    except Exception as ex:
+        print(ex)
+
+def branch_and_upload(file, new_branch):
+    # new_branch is organized as time stamp
+
+    repo = git.get_user().get_repo(app.config["GITHUB_REPO"])
+    username = current_user.username
+
+    commit_message = "new strategy uploaded by " + username + " at time " + new_branch
+    source_branch = 'main'
+    sb = repo.get_branch(source_branch)
+    ret = repo.create_git_ref(ref='refs/heads/' + new_branch, sha=sb.commit.sha)
+
+    filename = "strategy.py"
+    filepath = os.path.join(username, filename) # file path without prefix
+    repo.create_file(filepath, commit_message, file.read(), new_branch)
+
+    return filepath
 # Forms: registration, login, account
 
 class RegistrationForm(FlaskForm):
