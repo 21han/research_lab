@@ -29,8 +29,9 @@ logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 
-app.config['SECRET_KEY']
+app.config['SECRET_KEY'] = '5791628bb0b13ce0c676dfde280ba245'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///alchemist.db'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///user.db'
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
@@ -85,6 +86,28 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
+# @app.route("/")
+# @app.route("/login", methods=['GET', 'POST'])
+# def login():
+#     if current_user.is_authenticated:
+#         return redirect(url_for('home'))
+#     form = LoginForm()
+#     if form.validate_on_submit():
+#         # admin
+#         if form.email.data == 'admin@backtesting.com' and form.password.data == 'admin':
+#             flash('Welcome boss!', 'success')
+#             return redirect(url_for('admin'))
+#
+#         user = User.query.filter_by(email=form.email.data).first()
+#         if user and bcrypt.check_password_hash(user.password, form.password.data):
+#             login_user(user, remember=form.remember.data)
+#             next_page = request.args.get('next')
+#             return redirect(next_page) if next_page else redirect(url_for('home'))
+#         else:
+#             flash('Login Unsuccessful. Please check email and password', 'danger')
+#
+#     return render_template('login.html', title='Login', form=form)
+
 @app.route("/")
 @app.route("/login", methods=['GET', 'POST'])
 def login():
@@ -92,10 +115,11 @@ def login():
         return redirect(url_for('home'))
     form = LoginForm()
     if form.validate_on_submit():
-        # # admin
-        # if form.email.data == 'admin@backtesting.com' and form.password.data == 'admin':
-        #     flash('Welcome boss!', 'success')
-        #     return redirect(url_for('admin'))
+        # admin
+        if form.email.data == 'admin@backtesting.com' and form.password.data == 'admin':
+            flash('Welcome boss!', 'success')
+            users = User.query.all()
+            return redirect(url_for('admin'))
 
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password, form.password.data):
@@ -105,7 +129,8 @@ def login():
         else:
             flash('Login Unsuccessful. Please check email and password', 'danger')
 
-    return render_template('login.html', title='Login', form=form)
+    users = User.query.all()
+    return render_template('login.html', title='Login', form=form, users=users)
 
 
 @app.route("/register", methods=['GET', 'POST'])
