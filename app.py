@@ -17,10 +17,10 @@ from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationE
 
 from werkzeug.utils import secure_filename
 from datetime import datetime
+import shutil
 
-# github api
-from github import Github
-from github import InputGitTreeElement
+# pylint
+from pylint.lint import Run
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
@@ -33,8 +33,6 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
-
-git = Github(login_or_token=app.config["GITHUB_TOKEN"])
 
 # endpoint routes
 
@@ -59,6 +57,7 @@ def home():
 @app.route("/home", methods=["POST"])
 @login_required
 def upload_strategy():
+
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
@@ -83,16 +82,48 @@ def upload_strategy():
     if not file:
         return "File not found. Please upload it again"
 
-    file.filename = secure_filename(file.filename)
-    timestamp = str(datetime.now()).split('.')[0]
-    timestamp = '-'.join(timestamp.split(':'))
-    new_branch = '-'.join(timestamp.split()) # use time stamp to debug
+    username = current_user.username
+    folder = 'strategies/' + username
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
-    filepath = branch_and_upload(file, new_branch) # folder and branch name will be the same
-    merge_branch(new_branch)
-    delete_branch(new_branch)
+    # get the number of folders
+    
+    cnt = len([_ for _ in os.listdir(folder)])
 
-    message = "Your strategy " + name + " is uploaded successfully"
+    print("folder number is ", cnt)
+    new_folder = "strategy" + str(cnt + 1)
+    strategy_folder = os.path.join(folder, new_folder)
+    os.makedirs(strategy_folder) # it must be new file
+
+    # name file to be main.py
+    filepath = os.path.join(strategy_folder, "main.py")
+    file.save(filepath)
+    result = Run([filepath], do_exit=False)
+
+    # may be need threshold 
+    if "global_note" not in result.linter.stats or result.linter.stats['global_note'] <= 0:
+        shutil.rmtree(strategy_folder)
+        return "Your strategy has error or is not able to run! \
+            ect your file and upload again"
+    
+    # store in database
+    score = result.linter.stats['global_note']
+    conn = sqlite3.connect("alchemist.db")
+    cursor = conn.cursor()
+    timestamp = str(datetime.now())
+
+    # warning: watchout for the primary key as strategy_id: need auto increment
+    cursor.execute(
+        '''INSERT INTO strategies (user_id, strategy_location, \
+            last_modified_date, last_modified_user, strategy_name) VALUES (?,?,?,?,?)''',
+            (current_user.id, filepath, timestamp, username, name)
+    )
+    conn.commit()
+    print("affected rows = {}".format(cursor.rowcount))
+
+    message = "Your strategy " + name + " is uploaded successfully with pylint score " + str(score) + "/10.00"
+
     return message
 
 @app.route("/login", methods=['GET', 'POST'])
@@ -160,7 +191,6 @@ def account():
     return render_template('account.html', title='Account', image_file=image_file, form=form)
 
 
-
 @app.route('/strategies')
 def all_strategy():
     # TODO remove hard code of user after integration with Michael
@@ -214,42 +244,6 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config["ALLOWED_EXTENSIONS"]
 
-def delete_branch(branchname):
-    repo = git.get_user().get_repo(app.config["GITHUB_REPO"])
-    # repo = git.get_user().get_repo("gzhami/research_lab")
-    
-    src = repo.get_git_ref("heads/"+branchname)
-    response = src.delete()
-    print(response)
-
-def merge_branch(branch_name, commit_message="merge after successful check", base="main"):
-    try:
-        # base = repo.get_branch(base)
-        repo = git.get_user().get_repo(app.config["GITHUB_REPO"])
-        head = repo.get_branch(branch_name)
-
-        merge_to_master = repo.merge(base,
-                            head.commit.sha, commit_message)
-        pprint(merge_to_master)
-    except Exception as ex:
-        print(ex)
-
-def branch_and_upload(file, new_branch):
-    # new_branch is organized as time stamp
-
-    repo = git.get_user().get_repo(app.config["GITHUB_REPO"])
-    username = current_user.username
-
-    commit_message = "new strategy uploaded by " + username + " at time " + new_branch
-    source_branch = 'main'
-    sb = repo.get_branch(source_branch)
-    ret = repo.create_git_ref(ref='refs/heads/' + new_branch, sha=sb.commit.sha)
-
-    filename = "strategy.py"
-    filepath = os.path.join(username, filename) # file path without prefix
-    repo.create_file(filepath, commit_message, file.read(), new_branch)
-
-    return filepath
 # Forms: registration, login, account
 
 class RegistrationForm(FlaskForm):

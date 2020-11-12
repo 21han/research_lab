@@ -57,8 +57,6 @@ Check your secret key is in the enviroment path
 printenv
 ```
 
-# TODO: write doc for github token
-
 # Run the app
 ```sh
 python app.py
