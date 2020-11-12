@@ -36,6 +36,7 @@ login_manager.login_message_category = 'info'
 
 # endpoint routes
 
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -54,6 +55,7 @@ def home():
     context = {"username": current_user.username}
     return render_template('home.html', **context)
 
+
 @app.route("/home", methods=["POST"])
 @login_required
 def upload_strategy():
@@ -62,8 +64,8 @@ def upload_strategy():
         return "No user_file is specified"
     if "strategy_name" not in request.form:
         return "Strategy name may not be empty"   
-    file   = request.files["user_file"]
-    name   = request.form["strategy_name"] 
+    file = request.files["user_file"]
+    name = request.form["strategy_name"] 
     '''
         These attributes are also available
 
@@ -78,7 +80,7 @@ def upload_strategy():
 
     if not allowed_file(file.filename):
         return "Your file extension type is not allowed"
-    
+
     if not file:
         return "File not found. Please upload it again"
 
@@ -88,7 +90,7 @@ def upload_strategy():
         os.makedirs(folder)
 
     # get the number of folders
-    
+
     cnt = len([_ for _ in os.listdir(folder)])
 
     print("folder number is ", cnt)
@@ -101,12 +103,13 @@ def upload_strategy():
     file.save(filepath)
     result = Run([filepath], do_exit=False)
 
-    # may be need threshold 
-    if "global_note" not in result.linter.stats or result.linter.stats['global_note'] <= 0:
+    # may be need threshold
+    if "global_note" not in result.linter.stats or \
+            result.linter.stats['global_note'] <= 0:
         shutil.rmtree(strategy_folder)
         return "Your strategy has error or is not able to run! \
             ect your file and upload again"
-    
+
     # store in database
     score = result.linter.stats['global_note']
     conn = sqlite3.connect("alchemist.db")
@@ -116,8 +119,9 @@ def upload_strategy():
     # warning: watchout for the primary key as strategy_id: need auto increment
     cursor.execute(
         '''INSERT INTO strategies (user_id, strategy_location, \
-            last_modified_date, last_modified_user, strategy_name) VALUES (?,?,?,?,?)''',
-            (current_user.id, filepath, timestamp, username, name)
+            last_modified_date, last_modified_user, strategy_name) \
+                VALUES (?,?,?,?,?)''',
+                (current_user.id, filepath, timestamp, username, name)
     )
     conn.commit()
     print("affected rows = {}".format(cursor.rowcount))
@@ -125,6 +129,7 @@ def upload_strategy():
     message = "Your strategy " + name + " is uploaded successfully with pylint score " + str(score) + "/10.00"
 
     return message
+
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
@@ -150,8 +155,9 @@ def login():
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():
-        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        user = User(username=form.username.data, email=form.email.data, password=hashed_password)
+        hashed_password = bcrypt.generate_password_hash(sform.password.data).decode('utf-8')
+        user = User(username=form.username.data,
+            email=form.email.data, password=hashed_password)
         db.session.add(user)
         db.session.commit()
         flash(f'Your account has been created! You are now able to log in', 'success')
@@ -210,6 +216,7 @@ def display_strategy():
 
 # helper functions
 
+
 def save_picture(form_picture):
     random_hex = secrets.token_hex(8)
     _, f_ext = os.path.splitext(form_picture.filename)
@@ -238,6 +245,7 @@ def get_strategy_location(strategy_id):
     logger.info(f"[db] - {s_loc}")
     return s_loc
 
+
 def allowed_file(filename):
     # allowed file extenstion
     # see config.py
@@ -245,6 +253,7 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in app.config["ALLOWED_EXTENSIONS"]
 
 # Forms: registration, login, account
+
 
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
