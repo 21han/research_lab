@@ -96,7 +96,7 @@ def upload_strategy():
     print("folder number is ", cnt)
     new_folder = "strategy" + str(cnt + 1)
     strategy_folder = os.path.join(folder, new_folder)
-    os.makedirs(strategy_folder) # it must be new file
+    os.makedirs(strategy_folder)  # it must be new file
 
     # name file to be main.py
     filepath = os.path.join(strategy_folder, "main.py")
@@ -108,7 +108,7 @@ def upload_strategy():
             result.linter.stats['global_note'] <= 0:
         shutil.rmtree(strategy_folder)
         return "Your strategy has error or is not able to run! \
-            ect your file and upload again"
+            correct your file and upload again"
 
     # store in database
     score = result.linter.stats['global_note']
