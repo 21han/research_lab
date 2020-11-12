@@ -1,12 +1,14 @@
-# This is a sample Dash template.
+"""
+This is a sample Dash template.
+"""
 
-import dash
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output, State
 import pandas as pd
 import plotly.express as px
+import dash
+from dash.dependencies import Input, Output, State
 
 # Initialize the dash app
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -17,14 +19,19 @@ app.layout = html.Div()
     Output('my_close_price_graph', 'figure'),
     [Input('submit-button', 'n_clicks')],
     [State('my_pnl_symbol', 'value')])
-def update_graph(n_clicks, title):
+def update_graph(title):
+    """
+    @Erica, please add docstring
+    :param title:
+    :return:
+    """
     graph_data = []
 
     # TODO: need to modify this.
-    path = title+'.csv'
-    df = pd.read_csv(path)
-    graph_data.append({'x': df['date'], 'y': df['pnl']})
-    fig = px.line(df, x='date', y='pnl', title='PNL with' + title)
+    path = title + '.csv'
+    graph_data_df = pd.read_csv(path)
+    graph_data.append({'x': graph_data_df['date'], 'y': graph_data_df['pnl']})
+    fig = px.line(graph_data_df, x='date', y='pnl', title='PNL with' + title)
 
     fig.update_xaxes(
         rangeslider_visible=True,
@@ -39,6 +46,7 @@ def update_graph(n_clicks, title):
         )
     )
     return fig
+
 
 if __name__ == '__main__':
 
@@ -112,5 +120,3 @@ if __name__ == '__main__':
 
     app.layout = html.Div([sidebar, content])
     app.run_server(port='8083')
-
-
