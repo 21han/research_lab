@@ -2,9 +2,9 @@
 
 #### Three sample users in current user database:
 
-* email: 123@123.com password:
-* email: michael@google.com  password:
-* email: admin@backtesting.com password:
+* email: 123@123.com 
+* email: michael@google.com  
+* email: admin@backtesting.com
 
 (feel free to create more through register page)
 
