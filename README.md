@@ -16,6 +16,16 @@ How to update project environment?
 * You should not update project environment often. If you do need to update, 
 please follow these steps: 
 (1) `rm env.yml` 
+(1.5) make sure you are actually using the correct conda environment
 (2) use `conda env export --no-builds > env.yml` to update the file 
 (3) use `git diff` to check if the change makes sense
 (4) contact repo owner to make change `environment` changes
+
+
+# Style Check
+
+How to check style?
+
+```
+pylint **/*.py
+```

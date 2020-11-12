@@ -20,4 +20,3 @@ jobs:
         run: |
           conda info
           conda list
-          pylint **/*.py
