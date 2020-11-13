@@ -63,9 +63,9 @@ def upload_strategy():
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
-        return "Strategy name may not be empty"   
+        return "Strategy name may not be empty"
     file = request.files["user_file"]
-    name = request.form["strategy_name"] 
+    name = request.form["strategy_name"]
     '''
         These attributes are also available
 
@@ -124,7 +124,7 @@ def upload_strategy():
                 (current_user.id, filepath, timestamp, username, name)
     )
     conn.commit()
-    print("affected rows = {}".format(cursor.rowcount))
+    logger.info(f"affected rows = {cursor.rowcount}")
 
     message = "Your strategy " + name + \
         " is uploaded successfully with pylint score " + \
