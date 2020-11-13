@@ -126,7 +126,9 @@ def upload_strategy():
     conn.commit()
     print("affected rows = {}".format(cursor.rowcount))
 
-    message = "Your strategy " + name + " is uploaded successfully with pylint score " + str(score) + "/10.00"
+    message = "Your strategy " + name + \
+        " is uploaded successfully with pylint score " + \
+            str(score) + "/10.00"
 
     return message
 

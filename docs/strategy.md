@@ -8,6 +8,12 @@ we stick to the schema in strategies table under alchemist.db
 ## location
 the location is relative to the flask app, e.g. strategies/Michael/strategy7/main.py
 
+for example, I log in as Michael and upload strategy
+
+![example](../images/db_strategies_example.png)
+
+Take a look at the third row in the database, and the location and modifier will be there
+
 ## TODO
 I suggest the database schema to have auto_increment of strategy_id, and link a foreign_ket from user_id to user.user_id
 
