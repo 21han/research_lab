@@ -14,6 +14,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
+from db_utils import rds
 
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -112,7 +113,7 @@ def upload_strategy():
 
     # store in database
     score = result.linter.stats['global_note']
-    conn = sqlite3.connect("alchemist.db")
+    conn = rds.get_connection()
     cursor = conn.cursor()
     timestamp = str(datetime.now())
 
@@ -232,13 +233,12 @@ def save_picture(form_picture):
 
 
 def get_user_strategies(user_id):
-    conn = sqlite3.connect("alchemist.db")
-    strategies = pd.read_sql(f"select * from strategies where user_id = {user_id};", conn)
+    strategies = rds.get_all_strategies(user_id)
     return strategies
 
 
 def get_strategy_location(strategy_id):
-    conn = sqlite3.connect("alchemist.db")
+    conn = rds.get_connection()
     strategies = pd.read_sql(
         f"select * from strategies where strategy_id = {strategy_id};",
         conn
