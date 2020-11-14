@@ -27,3 +27,9 @@ navigate to project folder
 ./start.sh
 ```
 
+# update conda environment
+
+```sh
+conda env update --file env.yml
+```
+

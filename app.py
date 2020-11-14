@@ -27,8 +27,7 @@ logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 app.config.from_object("config")
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['FLASK_ENV'] = 'development'
+
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
