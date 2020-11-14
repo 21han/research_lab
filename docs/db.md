@@ -42,7 +42,7 @@ create table strategies
 
 # Setting up connection
 
-Using database management applications are strongly encourages. **DataGrips** from Jetbrain is highly recommended
+Using database management applications are strongly encouraged. **DataGrips** from JetBrain is highly recommended
 
 ## Step 1: Download DataGrip
 Download DataGrip from Google
@@ -55,16 +55,11 @@ You need to create credentials to access AWS RDB from local
 touch .cred
 ```
 
-Ask adminstration to paste the credential to .cred file. Tell the adminstrator your public IP to get access. Go to google and search "what is my IP" and you will get it.
+Ask administrator to paste the credential to `.cred` file. Share with administrator your public IP to get access. Go to google and search "what is my IP" and you will get it.
 
 Finally 
 ```sh
-source .cred
-```
-
-Make sure you have the environment set up specified in the .cred file
-```sh
-printenv
+./start.sh
 ```
 
 ## Step 3. Use DataGrip to test your connection

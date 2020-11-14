@@ -1,5 +1,7 @@
-#!/bin/bash
+# you need .cred file locally
 source .cred
+
+# flask settings
 export FLASK_DEBUG=True
 export FLASK_ENV='development'
-flask run --host 0.0.0.0 --port 5000
+python -m flask run

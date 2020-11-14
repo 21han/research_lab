@@ -1,6 +1,5 @@
 from flask import Flask, redirect, url_for, request, flash, render_template, session
 from flask import render_template
-import sqlite3
 from flask import request
 import logging
 import pandas as pd
@@ -14,9 +13,8 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
-from .db_utils import rds
+from db_utils import rds
 
-from werkzeug.utils import secure_filename
 from datetime import datetime
 import shutil
 
@@ -29,6 +27,9 @@ logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 app.config.from_object("config")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['FLASK_ENV'] = 'development'
+
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)

@@ -20,19 +20,10 @@ conda activate ResearchLab
 ```
 
 # Run the app
-```sh
-python app.py
-```
 
-I also suggest that we can use the script file which is much easier to configure and run and get rid of some annoying warnings
+navigate to project folder
 
 ```sh
-chmod +x bin/flaskrun    
-```
-
-and run the script:
-
-```sh
-./bin/flaskrun
+./start.sh
 ```
 
