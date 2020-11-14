@@ -12,6 +12,9 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.8
+    - name: update conda to latest version
+      run: |
+        $CONDA/bin/conda update -n base -c defaults conda
     - name: Install dependencies
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
