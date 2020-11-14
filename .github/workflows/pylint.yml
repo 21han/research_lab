@@ -1,22 +1,21 @@
 name: Pylint
+
 on: [push]
 
 jobs:
-  miniconda:
-    name: Miniconda ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-        matrix:
-            os: ["ubuntu-latest"]
+  build-linux:
+    runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v2
-      - uses: goanpeca/setup-miniconda@v1
-        with:
-          activate-environment: test
-          environment-file: env.yml
-          python-version: 3.8
-          auto-activate-base: false
-      - shell: bash -l {0}
-        run: |
-          conda info
-          conda list
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        $CONDA/bin/conda env update --file env.yml --name ResearchLab
+    - name: Pylint
+      run: |
+        $CONDA/envs/ResearchLab/bin/pylint **/*.py --exit-zero
