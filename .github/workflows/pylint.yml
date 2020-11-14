@@ -12,12 +12,13 @@ jobs:
       - uses: actions/checkout@v2
       - uses: goanpeca/setup-miniconda@v1
         with:
-          activate-environment: test
+          activate-environment: ResearchLab
           environment-file: env.yml
           python-version: 3.8
           auto-activate-base: false
       - shell: bash -l {0}
         run: |
+          conda update -n base -c defaults conda
           conda info
           conda list
       - run: pylint **/*.py
