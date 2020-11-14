@@ -21,4 +21,5 @@ jobs:
           conda update -n base -c defaults conda
           conda info
           conda list
+          conda activate ResearchLab
       - run: pylint **/*.py
