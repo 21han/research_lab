@@ -1,3 +1,24 @@
 {% extends "layout.html" %}
 {% block content %}
+<<<<<<< HEAD
+=======
+    <h1>Home Page For {{username}}</h1>
+    <h1>Upload Your Files Here</h1>
+
+    <form action="/home" method="POST" enctype="multipart/form-data">
+
+        <label for="user_file">Upload Your File. Note that your file should be a .py file</label>
+        <br></br>
+        <input type="file" name="user_file">
+        <br></br>
+
+        <label for="strategy_name">Enter your strategy name, e.g. "Michael's strategy"</label>
+        <br></br>
+        <input type="text" name="strategy_name">
+        <br></br>
+
+        <button type="submit">Upload</button>
+
+    </form>
+>>>>>>> linxiao
 {% endblock content %}

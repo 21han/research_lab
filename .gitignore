@@ -1,4 +1,10 @@
 bin/
-env/
+env/ 
 .idea/
 __pycache__/
+
+# cred file
+.cred
+
+# vscode file
+.vscode

@@ -1,6 +1,5 @@
 from flask import Flask, redirect, url_for, request, flash, render_template, session
 from flask import render_template
-import sqlite3
 from flask import request
 import logging
 import pandas as pd
@@ -14,6 +13,13 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
+from db_utils import rds
+
+from datetime import datetime
+import shutil
+
+# pylint
+from pylint.lint import Run
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
@@ -21,15 +27,17 @@ logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 app.config.from_object("config")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
-
-
 # endpoint routes
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -44,8 +52,87 @@ def about():
 
 @app.route("/home")
 @login_required
+# current page is login required, which means not logging will be redirected
 def home():
-    return render_template('home.html')
+    context = {"username": current_user.username}
+    return render_template('home.html', **context)
+
+
+@app.route("/home", methods=["POST"])
+@login_required
+def upload_strategy():
+
+    if "user_file" not in request.files:
+        return "No user_file is specified"
+    if "strategy_name" not in request.form:
+        return "Strategy name may not be empty"
+    file = request.files["user_file"]
+    name = request.form["strategy_name"]
+    '''
+        These attributes are also available
+
+        file.filename               # The actual name of the file
+        file.content_type
+        file.content_length
+        file.mimetype
+
+    '''
+    if file.filename == "":
+        return "Please select a file"
+
+    if not allowed_file(file.filename):
+        return "Your file extension type is not allowed"
+
+    if not file:
+        return "File not found. Please upload it again"
+
+    username = current_user.username
+    folder = 'strategies/' + username
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    # get the number of folders
+
+    cnt = len([_ for _ in os.listdir(folder)])
+
+    print("folder number is ", cnt)
+    new_folder = "strategy" + str(cnt + 1)
+    strategy_folder = os.path.join(folder, new_folder)
+    os.makedirs(strategy_folder)  # it must be new file
+
+    # name file to be main.py
+    filepath = os.path.join(strategy_folder, "main.py")
+    file.save(filepath)
+    result = Run([filepath], do_exit=False)
+
+    # may be need threshold
+    if "global_note" not in result.linter.stats or \
+            result.linter.stats['global_note'] <= 0:
+        shutil.rmtree(strategy_folder)
+        return "Your strategy has error or is not able to run! \
+            correct your file and upload again"
+
+    # store in database
+    score = result.linter.stats['global_note']
+    conn = rds.get_connection()
+    cursor = conn.cursor()
+    timestamp = str(datetime.now())
+
+    # warning: watchout for the primary key as strategy_id: need auto increment
+    cursor.execute(
+        '''INSERT INTO strategies (user_id, strategy_location, \
+            last_modified_date, last_modified_user, strategy_name) \
+                VALUES (?,?,?,?,?)''',
+                (current_user.id, filepath, timestamp, username, name)
+    )
+    conn.commit()
+    logger.info(f"affected rows = {cursor.rowcount}")
+
+    message = "Your strategy " + name + \
+        " is uploaded successfully with pylint score " + \
+            str(score) + "/10.00"
+
+    return message
 
 
 @app.route("/login", methods=['GET', 'POST'])
@@ -73,7 +160,8 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        user = User(username=form.username.data, email=form.email.data, password=hashed_password)
+        user = User(username=form.username.data,
+            email=form.email.data, password=hashed_password)
         db.session.add(user)
         db.session.commit()
         flash(f'Your account has been created! You are now able to log in', 'success')
@@ -113,11 +201,10 @@ def account():
     return render_template('account.html', title='Account', image_file=image_file, form=form)
 
 
-
 @app.route('/strategies')
 def all_strategy():
     # TODO remove hard code of user after integration with Michael
-    current_user_id = 0
+    current_user_id = 1
     all_user_strategies = get_user_strategies(current_user_id)
     # display all user strategy as a table on the U.I.
     return render_template('strategies.html', df=all_user_strategies)
@@ -133,6 +220,7 @@ def display_strategy():
 
 # helper functions
 
+
 def save_picture(form_picture):
     random_hex = secrets.token_hex(8)
     _, f_ext = os.path.splitext(form_picture.filename)
@@ -146,13 +234,12 @@ def save_picture(form_picture):
 
 
 def get_user_strategies(user_id):
-    conn = sqlite3.connect("alchemist.db")
-    strategies = pd.read_sql(f"select * from strategies where user_id = {user_id};", conn)
+    strategies = rds.get_all_strategies(user_id)
     return strategies
 
 
 def get_strategy_location(strategy_id):
-    conn = sqlite3.connect("alchemist.db")
+    conn = rds.get_connection()
     strategies = pd.read_sql(
         f"select * from strategies where strategy_id = {strategy_id};",
         conn
@@ -162,7 +249,14 @@ def get_strategy_location(strategy_id):
     return s_loc
 
 
+def allowed_file(filename):
+    # allowed file extenstion
+    # see config.py
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in app.config["ALLOWED_EXTENSIONS"]
+
 # Forms: registration, login, account
+
 
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
