@@ -24,7 +24,8 @@ def strategy(data):
     return random.randrange(-10000, 10000)
 
 
-# TODO: user shouldn't be uploading this part of this code. We shoud handle this in application logic
+# TODO: user shouldn't be uploading this part of this code.
+#  We should handle this in application logic
 date, pnl = [], []
 for i, r in SAMPLE_DATA.iterrows():
     date.append(r['date'])

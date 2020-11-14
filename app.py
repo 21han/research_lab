@@ -165,21 +165,18 @@ def upload_strategy():
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
-    """authenticate current user to access the platform with valid email and password registered in user table
+    """authenticate current user to access the platform with valid email and
+       password registered in user table
 
     Returns:
-        function: render login.html page with title Login, redirect user to home page when successfully authenticate
+        function: render login.html page with title Login, redirect user to home page
+        when successfully authenticate
     """
 
     if current_user.is_authenticated:
         return redirect(url_for('home'))
     form = LoginForm()
     if form.validate_on_submit():
-        # # admin
-        # if form.email.data == 'admin@backtesting.com' and form.password.data \
-        #         == 'admin':
-        #     flash('Welcome boss!', 'success')
-        #     return redirect(url_for('admin'))
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password,
                                                form.password.data):
@@ -239,8 +236,8 @@ def logout():
 @app.route("/account", methods=['GET', 'POST'])
 @login_required
 def account():
-    """display current user's account information and allows the current user to update their username, email and upload
-       profile image
+    """display current user's account information and allows the current user to
+       update their username, email and upload profile image
 
     Returns:
         function : render account.html page with title account
@@ -466,7 +463,8 @@ class User(db.Model, UserMixin):
 
     Args:
         db (SQLAlchemy database): SQLAlchemy database
-        UserMixin (userMixin): inherit userMixin object provide default implementations of User object.
+        UserMixin (userMixin): inherit userMixin object
+        provide default implementations of User object.
 
     Returns:
         None: none
@@ -478,10 +476,17 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(60), nullable=False)
 
     def __repr__(self):
-        return f"User('{self.username}', '{self.email}', '{self.image_file}')"
+        """
+        :return: stirng contains userid, username, user email of user object
+        """
+        return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
 def main():
+    """
+    run app
+    :return: None
+    """
     app.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
 
 
