@@ -119,10 +119,9 @@ def upload_strategy():
 
     # warning: watchout for the primary key as strategy_id: need auto increment
     cursor.execute(
-        '''INSERT INTO strategies (user_id, strategy_location, \
+        "INSERT INTO strategies (user_id, strategy_location, \
             last_modified_date, last_modified_user, strategy_name) \
-                VALUES (?,?,?,?,?)''',
-                (current_user.id, filepath, timestamp, username, name)
+                VALUES (%d,%s,%s,%s,%s)" % (current_user.id, filepath, timestamp, username, name)
     )
     conn.commit()
     logger.info(f"affected rows = {cursor.rowcount}")
