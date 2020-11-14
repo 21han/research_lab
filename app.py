@@ -28,7 +28,7 @@ logger.setLevel(logging.DEBUG)
 app = Flask(__name__)
 app.config.from_object("config")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['FLASK_ENV'] = 'development'
+
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
@@ -204,7 +204,7 @@ def account():
 @app.route('/strategies')
 def all_strategy():
     # TODO remove hard code of user after integration with Michael
-    current_user_id = 0
+    current_user_id = 1
     all_user_strategies = get_user_strategies(current_user_id)
     # display all user strategy as a table on the U.I.
     return render_template('strategies.html', df=all_user_strategies)
