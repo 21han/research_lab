@@ -29,7 +29,7 @@ create table strategies
 (
 	user_id int not null,
 	strategy_location varchar(1024) not null,
-	strategy_id int not null
+	strategy_id int auto_increment
 		primary key,
 	last_modified_date datetime not null,
 	last_modified_user varchar(32) null,
@@ -76,6 +76,7 @@ test connection, which is in the below, and it should be successful
 ## Quickly test the connection in terminal so that will run successfully in the flask server
 
 ```python
+# under research_lab/ folder
 ❯ python
 Python 3.8.5 (default, Sep  4 2020, 02:22:02) 
 [Clang 10.0.0 ] :: Anaconda, Inc. on darwin
