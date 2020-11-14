@@ -5,3 +5,6 @@ __pycache__/
 
 # cred file
 .cred
+
+# vscode file
+.vscode
