@@ -1,0 +1,5 @@
+export USER_SERVICE_SECRET_KEY='e5ac358c-f0bf-11e5-9e39-d3b532c10a28'
+export USER_SERVICE_HOST='user-service-db.ci3ta0leimzm.us-east-2.rds.amazonaws.com'
+export USER_SERVICE_USER='admin'
+export USER_SERVICE_PASSWORD='fSG0QU6MLojEbSzbQ0sZ'
+export USER_SERVICE_PORT='3306'

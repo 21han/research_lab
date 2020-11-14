@@ -1,37 +1,35 @@
-"""
-This is a sample Dash template.
-"""
+# This is a sample Dash template.
 
+import dash_plots
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
+from dash_plots.dependencies import Input, Output, State
 import pandas as pd
 import plotly.express as px
-import dash
-from dash.dependencies import Input, Output, State
+from flask import Flask
 
-# Initialize the dash app
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
-app.layout = html.Div()
+# Initialize the dash_plots app
+dashapp = dash_plots.Dash(__name__, requests_pathname_prefix='/dash_plots/', external_stylesheets=[dbc.themes.BOOTSTRAP])
+dashapp.layout = html.Div('dash_plots test')
 
-
-@app.callback(
-    Output('my_close_price_graph', 'figure'),
+@dashapp.callback(
+    Output('my_pnl_graph', 'figure'),
     [Input('submit-button', 'n_clicks')],
     [State('my_pnl_symbol', 'value')])
-def update_graph(title):
+def update_graph(n_clicks, strategy_name):
     """
-    @Erica, please add docstring
-    :param title:
+    Update graph based on the clicked graph.
+    :param strategy_name: Strategy name.
+    :param file_path: Strategy file path.
     :return:
     """
-    graph_data = []
 
-    # TODO: need to modify this.
-    path = title + '.csv'
-    graph_data_df = pd.read_csv(path)
-    graph_data.append({'x': graph_data_df['date'], 'y': graph_data_df['pnl']})
-    fig = px.line(graph_data_df, x='date', y='pnl', title='PNL with' + title)
+    graph_data = []
+    file_path = strategy_name + '.csv'
+    df = pd.read_csv(file_path)
+    graph_data.append({'x': df['date'], 'y': df['pnl']})
+    fig = px.line(df, x='date', y='pnl', title='PNL with' + strategy_name)
 
     fig.update_xaxes(
         rangeslider_visible=True,
@@ -47,16 +45,19 @@ def update_graph(title):
     )
     return fig
 
-
-if __name__ == '__main__':
-
+def plotting():
+    """
+    Plotting the PnL results, including graph, table and should be able to compare different results.
+    :return:
+    """
     # Create a sidebar with stock to select
-
-    # TODO: need to modify this.
-    str_name_dic = {'STRG1': 'Strategy1', 'STRG2': 'Strategy2', 'STRG3': 'Strategy3'}
+    strategy_paths = {'STRG1': 'Strategy1', 'STRG2': 'Strategy2', 'STRG3': 'Strategy3'}
+    user_id = 0
+    # strategy_ids = get_user_strategies(user_id)
+    # strategy_paths = { get_strategy_location(str_id) : str_id for str_id in strategy_ids}
     options = []
-    for ticker in str_name_dic:
-        options.append({'label': '{}-{}'.format(str_name_dic[ticker], ticker), 'value': ticker})
+    for str_path in strategy_paths:
+        options.append({'label': '{}-{}'.format(strategy_paths[str_path], str_path), 'value': str_path})
 
     SIDEBAR_STYLE = {
         "position": "fixed",
@@ -91,7 +92,7 @@ if __name__ == '__main__':
 
     sidebar = html.Div(
         [
-            html.H2("PnL", className="display-4"),
+            html.H2("PnL Dashboard", className="display-4"),
             html.Hr(),
             controls
         ],
@@ -110,7 +111,7 @@ if __name__ == '__main__':
             html.Hr(),
             dbc.Row(
                 [
-                    dbc.Col(dcc.Graph(id="my_close_price_graph"),
+                    dbc.Col(dcc.Graph(id="my_pnl_graph"),
                             width={"size": 8, "offset": 2}),
                 ]
             )
@@ -118,5 +119,11 @@ if __name__ == '__main__':
         style=CONTENT_STYLE
     )
 
-    app.layout = html.Div([sidebar, content])
-    app.run_server(port='8083')
+    dashapp.layout = html.Div([sidebar, content])
+
+
+
+if __name__ == "__main__":
+
+    plotting()
+    dashapp.run_server(port=8083)
