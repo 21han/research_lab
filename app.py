@@ -45,13 +45,13 @@ login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
-    """[summary]
+    """User object with input user id
 
     Args:
-        user_id ([type]): [description]
+        user_id (int): primary key of user table
 
     Returns:
-        [type]: [description]
+        User: User object with input user id
     """
     return User.query.get(int(user_id))
 
@@ -59,10 +59,10 @@ def load_user(user_id):
 @app.route("/")
 @app.route("/welcome")
 def about():
-    """[summary]
+    """Welcome page of Backtesting platform, introduce features and functionalities of the platform
 
     Returns:
-        [type]: [description]
+        function: render welcome.html page with title About
     """
     return render_template('welcome.html', title='About')
 
@@ -71,10 +71,10 @@ def about():
 @login_required
 # current page is login required, which means not logging will be redirected
 def home():
-    """[summary]
+    """home page of the backtesting platform, login is required to access this page
 
     Returns:
-        [type]: [description]
+        function: render home.html page with context of login user's username
     """
     context = {"username": current_user.username}
     return render_template('home.html', **context)
@@ -83,10 +83,10 @@ def home():
 @app.route("/home", methods=["POST"])
 @login_required
 def upload_strategy():
-    """[summary]
+    """upload user strategy to alchemist database
 
     Returns:
-        [type]: [description]
+        string: return message of upload status with corresponding pylint score
     """
     if "user_file" not in request.files:
         return "No user_file is specified"
@@ -165,21 +165,18 @@ def upload_strategy():
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
-    """[summary]
+    """authenticate current user to access the platform with valid email and
+       password registered in user table
 
     Returns:
-        [type]: [description]
+        function: render login.html page with title Login, redirect user to home page
+        when successfully authenticate
     """
 
     if current_user.is_authenticated:
         return redirect(url_for('home'))
     form = LoginForm()
     if form.validate_on_submit():
-        # admin
-        if form.email.data == 'admin@backtesting.com' and form.password.data \
-                == 'admin':
-            flash('Welcome boss!', 'success')
-            return redirect(url_for('admin'))
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password,
                                                form.password.data):
@@ -195,10 +192,10 @@ def login():
 
 @app.route("/register", methods=['GET', 'POST'])
 def register():
-    """[summary]
+    """register a new user to the platform database
 
     Returns:
-        [type]: [description]
+        function: render register.html page with title Register
     """
     form = RegistrationForm()
     if form.validate_on_submit():
@@ -217,32 +214,33 @@ def register():
 @app.route("/admin", methods=['GET', 'POST'])
 # @login_required
 def admin():
-    """[summary]
+    """render admin user page
 
     Returns:
-        [type]: [description]
+        function: render admin.html page
     """
     return render_template('admin.html')
 
 
 @app.route("/logout")
 def logout():
-    """[summary]
+    """logout current user and kill the user's session
 
     Returns:
-        [type]: [description]
+        function: redirect user to welcome page
     """
     logout_user()
-    return redirect(url_for('home'))
+    return redirect(url_for('welcome'))
 
 
 @app.route("/account", methods=['GET', 'POST'])
 @login_required
 def account():
-    """[summary]
+    """display current user's account information and allows the current user to
+       update their username, email and upload profile image
 
     Returns:
-        [type]: [description]
+        function : render account.html page with title account
     """
     form = UpdateAccountForm()
     if form.validate_on_submit():
@@ -265,10 +263,10 @@ def account():
 
 @app.route('/strategies')
 def all_strategy():
-    """[summary]
+    """display all user strategy as a table on the U.I.
 
     Returns:
-        [type]: [description]
+        function: render strategies.html page
     """
     current_user_id = 0
     all_user_strategies = get_user_strategies(current_user_id)
@@ -278,10 +276,10 @@ def all_strategy():
 
 @app.route('/strategy')
 def display_strategy():
-    """[summary]
+    """display select strategy with id
 
     Returns:
-        [type]: [description]
+        function: strategy.html
     """
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
@@ -294,13 +292,13 @@ def display_strategy():
 
 
 def save_picture(form_picture):
-    """[summary]
+    """ save user uploaded profile picture with formatted size in database
 
     Args:
-        form_picture ([type]): [description]
+        form_picture (picture in jpg format): user upload picture
 
     Returns:
-        [type]: [description]
+        string: formatted picture string
     """
     random_hex = secrets.token_hex(8)
     _, f_ext = os.path.splitext(form_picture.filename)
@@ -315,10 +313,10 @@ def save_picture(form_picture):
 
 
 def get_user_strategies(user_id):
-    """[summary]
+    """get user strategies according to user id
 
     Args:
-        user_id ([type]): [description]
+        user_id (int): user identifier
 
     Returns:
         [type]: [description]
@@ -367,14 +365,14 @@ def allowed_file(filename):
 
 
 class RegistrationForm(FlaskForm):
-    """[summary]
+    """Form contains registered user information
 
     Args:
-        FlaskForm ([type]): [description]
+        FlaskForm (form): a flask form object
 
     Raises:
-        ValidationError: [description]
-        ValidationError: [description]
+        ValidationError: user name exists in the current user table
+        ValidationError: email address exists in the current user table
     """
     username = StringField('Username',
                            validators=[DataRequired(), Length(min=2, max=20)])
@@ -386,13 +384,13 @@ class RegistrationForm(FlaskForm):
     submit = SubmitField('Sign Up')
 
     def validate_username(self, username):
-        """[summary]
+        """check if username exists in the current user table
 
         Args:
-            username ([type]): [description]
+            username (string): input username of current user
 
         Raises:
-            ValidationError: [description]
+            ValidationError: the input username exists in the user table
         """
         user = User.query.filter_by(username=username.data).first()
         if user:
@@ -400,13 +398,13 @@ class RegistrationForm(FlaskForm):
                 'That username is taken. Please choose a different one.')
 
     def validate_email(self, email):
-        """[summary]
+        """check if input email address exists in the current user table
 
         Args:
-            email ([type]): [description]
+            email (string): email address with valid email format
 
         Raises:
-            ValidationError: [description]
+            ValidationError: current email exists in user table
         """
         user = User.query.filter_by(email=email.data).first()
         if user:
@@ -415,10 +413,10 @@ class RegistrationForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
-    """[summary]
+    """create a flask form object for login user
 
     Args:
-        FlaskForm ([type]): [description]
+        FlaskForm (flaskform): FlaskForm object
     """
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
@@ -427,14 +425,14 @@ class LoginForm(FlaskForm):
 
 
 class UpdateAccountForm(FlaskForm):
-    """[summary]
+    """create a flask form contains users' updated information of their account
 
     Args:
-        FlaskForm ([type]): [description]
+        FlaskForm (flaskform): Flaskform object
 
     Raises:
-        ValidationError: [description]
-        ValidationError: [description]
+        ValidationError: updated user name exists in user table
+        ValidationError: updated email exists in user table
     """
     username = StringField('Username',
                            validators=[DataRequired(), Length(min=2, max=20)])
@@ -461,14 +459,15 @@ class UpdateAccountForm(FlaskForm):
 # User object
 
 class User(db.Model, UserMixin):
-    """[summary]
+    """User object
 
     Args:
-        db ([type]): [description]
-        UserMixin ([type]): [description]
+        db (SQLAlchemy database): SQLAlchemy database
+        UserMixin (userMixin): inherit userMixin object
+        provide default implementations of User object.
 
     Returns:
-        [type]: [description]
+        None: none
     """
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(20), unique=True, nullable=False)
@@ -476,12 +475,18 @@ class User(db.Model, UserMixin):
     image_file = db.Column(db.String(20), nullable=False, default='default.jpg')
     password = db.Column(db.String(60), nullable=False)
 
-    # strategy = db.relationship('Strategy', backref='location', lazy=True)
     def __repr__(self):
-        return f"User('{self.username}', '{self.email}', '{self.image_file}')"
+        """
+        :return: stirng contains userid, username, user email of user object
+        """
+        return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
 def main():
+    """
+    run app
+    :return: None
+    """
     app.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
 
 
