@@ -1,3 +1,5 @@
+
+import numpy as np
 from dash import Dash
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 import flask
@@ -6,9 +8,9 @@ import plotly.express as px
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output, State
 import pandas as pd
 import dash_table as dt
+
 
 app = flask.Flask(__name__)
 dash_app = Dash(__name__, server=app, url_base_pathname='/plots/')
@@ -27,6 +29,7 @@ def render_reports():
     Redirect to dosh route for visualization.
     :return:
     """
+    get_plot()
     return flask.redirect('/dash_plot')
 
 
@@ -43,9 +46,10 @@ def fig_update(file_path):
     """
     graph_data = []
     file_path = file_path
-    df = pd.read_csv(file_path)
-    graph_data.append({'x': df['date'], 'y': df['pnl']})
-    fig = px.line(df, x='date', y='pnl')
+    pnl_df = pd.read_csv(file_path)
+    pnl_df['pnl'] = pnl_df['pnl'].cumsum()
+    graph_data.append({'x': pnl_df['date'], 'y': pnl_df['pnl']})
+    fig = px.line(pnl_df, x='date', y='pnl')
 
     fig.update_xaxes(
         rangeslider_visible=True,
@@ -63,13 +67,12 @@ def fig_update(file_path):
     return fig
 
 
-def make_table(table_path):
+def make_table(data):
     """
     Given the file path, return an updated table to display.
     :param table_path: string, to get csv file.
     :return: html.Div, the component in Dash containing table.
     """
-    data = pd.read_csv(table_path)
     return html.Div(
         [
             dt.DataTable(
@@ -99,7 +102,7 @@ def make_table(table_path):
     )
 
 
-def construct_plot(strategy_names, pnl_paths, table_paths) -> None:
+def construct_plot(strategy_names, pnl_paths, table_paths):
     """
     Construct whole structure of plots by given strategy_names, pnl_paths and table_paths.
     :param strategy_names: A dictionary to map strategy id to strategy name. 
@@ -108,7 +111,7 @@ def construct_plot(strategy_names, pnl_paths, table_paths) -> None:
                         Key is strategy id, value is a path string. 
     :param table_paths: A dictionary to map strategy id to corresponding table path of csv file. 
                         Key is strategy id, value is a path string. 
-    :return: None
+    :return: Lively dash layout.
     """ 
     
     options = []
@@ -131,16 +134,16 @@ def construct_plot(strategy_names, pnl_paths, table_paths) -> None:
         "padding": "2rem 1rem",
     }
 
-
     contents = []
     for str_key, str_name in strategy_names.items():
         pnl_fig = fig_update(pnl_paths[str_key])
-        table_df = pd.read_csv(table_paths[str_key])
+        table_df = pnl_summary(pnl_paths[str_key])
+
         contents.append(
             dcc.Tab(label=str_name, children=[
                 html.Div(
                     [
-                        html.H1('PnL Plot',
+                        html.H1('Cumulative Plot',
                                 style={'textAlign': 'center'}),
                         html.Hr(),
                         dbc.Row(
@@ -154,7 +157,7 @@ def construct_plot(strategy_names, pnl_paths, table_paths) -> None:
                 ),
                 html.Div(
                     [
-                        html.H1('Pyfolio Table',
+                        html.H1('Statistic Table',
                                 style={'font_size': '80',
                                        'text_align': 'center'}),
                         html.Hr(),
@@ -196,12 +199,17 @@ def construct_plot(strategy_names, pnl_paths, table_paths) -> None:
             ])
         )
 
-    dash_app.layout = html.Div([
-        dcc.Tabs(contents)
-    ])
+    return html.Div([dcc.Tabs(contents)])
 
 
 def get_plot():
+    """
+    Get two dictionaries, one mapping from strategy id to strategy name,
+    another is mapping from strategy id to strategy location. And then construct dash plot.
+    :return:
+    """
+    # Hard-code here for examples, will modify as sql query.
+
     strategy_names = {'STRG1': 'Strategy1',
                       'STRG2': 'Strategy2',
                       'STRG3': 'Strategy3'}
@@ -210,15 +218,64 @@ def get_plot():
                  'STRG2': './pnl_holder/STRG2.csv',
                  'STRG3': './pnl_holder/STRG3.csv'}
 
-    table_paths = {'STRG1': './pnl_holder/table1.csv',
-                   'STRG2': './pnl_holder/table2.csv',
-                   'STRG3': './pnl_holder/table3.csv'}
+    dash_app.layout = construct_plot(strategy_names, pnl_paths, table_paths)
 
-    construct_plot(strategy_names, pnl_paths, table_paths)
+
+def pnl_summary(path):
+    """
+    Statistic analysis of backtest result.
+    :param path: path to the pnl file.
+    :return: A dataframe contains two columns, category name and corresponding values.
+    """
+
+    data = pd.read_csv(path)
+    data['cumulative'] = data['pnl'].cumsum()
+    result = {'Category': [], 'Value': []}
+    total_date = data.shape[0]
+
+    return_value = (data['cumulative'].iloc[-1] - data['cumulative'].iloc[0]) / data['cumulative'][0]
+    # annual return
+    annual_return = round(return_value * (total_date / 365) * 100, 2)
+    result['Category'].append('Annual Return')
+    result['Value'].append(str(annual_return) + '%')
+
+    # Cumulative return
+    cumulative_return = round(return_value * 100, 2)
+    result['Category'].append('Cumulative Return')
+    result['Value'].append(str(cumulative_return) + '%')
+
+    # Annual volatility
+    annual_volatility = round(data['cumulative'].std() * np.sqrt(252), 2)
+    result['Category'].append('Annual Volatility')
+    result['Value'].append(str(annual_volatility) + '%')
+
+    # Sharpe ratio
+    r = data['cumulative'].diff()
+    sr = round(r.mean() / r.std() * np.sqrt(252), 2)
+    result['Category'].append('Sharpe Ratio')
+    result['Value'].append(str(sr))
+
+    # Max Dropdown
+    md = round( (np.max(data['pnl']) - np.min(data['pnl'])) / np.max(data['pnl']), 2)
+    result['Category'].append('Max Dropdown')
+    result['Value'].append(str(md))
+
+    # Skew
+    skew = round(data['pnl'].skew(), 2)
+    result['Category'].append('Skew')
+    result['Value'].append(str(skew))
+
+    # Kurtosis
+    kurtosis = round(data['pnl'].kurtosis(), 2)
+    result['Category'].append('Kurtosis')
+    result['Value'].append(str(kurtosis))
+
+    # Daily Turnover (optional)
+
+    return pd.DataFrame(result)
 
 
 def main():
-    # app.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
     get_plot()
     run_simple('0.0.0.0', 5000, app_embeds, use_reloader=True, use_debugger=True)
 
