@@ -102,15 +102,13 @@ def make_table(data):
     )
 
 
-def construct_plot(strategy_names, pnl_paths, table_paths):
+def construct_plot(strategy_names, pnl_paths):
     """
     Construct whole structure of plots by given strategy_names, pnl_paths and table_paths.
     :param strategy_names: A dictionary to map strategy id to strategy name. 
                            Key is strategy id, value is strategy name
     :param pnl_paths: A dictionary to map strategy id to corresponding pnl path of csv file. 
-                        Key is strategy id, value is a path string. 
-    :param table_paths: A dictionary to map strategy id to corresponding table path of csv file. 
-                        Key is strategy id, value is a path string. 
+                        Key is strategy id, value is a path string.
     :return: Lively dash layout.
     """ 
     
@@ -137,7 +135,7 @@ def construct_plot(strategy_names, pnl_paths, table_paths):
     contents = []
     for str_key, str_name in strategy_names.items():
         pnl_fig = fig_update(pnl_paths[str_key])
-        table_df = pnl_summary(pnl_paths[str_key])
+        table_df = pnl_summary(pd.read_csv(pnl_paths[str_key]))
 
         contents.append(
             dcc.Tab(label=str_name, children=[
@@ -218,24 +216,24 @@ def get_plot():
                  'STRG2': './pnl_holder/STRG2.csv',
                  'STRG3': './pnl_holder/STRG3.csv'}
 
-    dash_app.layout = construct_plot(strategy_names, pnl_paths, table_paths)
+    dash_app.layout = construct_plot(strategy_names, pnl_paths)
 
 
-def pnl_summary(path):
+def pnl_summary(data):
     """
     Statistic analysis of backtest result.
-    :param path: path to the pnl file.
-    :return: A dataframe contains two columns, category name and corresponding values.
+    :param data: A dataframe including the backtest results, contains date and pnl two columns.
+    :return: A dataframe for making the table, it contains two columns, category name and corresponding values.
     """
 
-    data = pd.read_csv(path)
     data['cumulative'] = data['pnl'].cumsum()
     result = {'Category': [], 'Value': []}
     total_date = data.shape[0]
+    print(total_date)
 
-    return_value = (data['cumulative'].iloc[-1] - data['cumulative'].iloc[0]) / data['cumulative'][0]
-    # annual return
-    annual_return = round(return_value * (total_date / 365) * 100, 2)
+    return_value = (data['cumulative'].iloc[-1] - data['cumulative'].iloc[0]) / data['cumulative'].iloc[0]
+    # Annual return
+    annual_return = round(return_value / (total_date / 365) * 100, 2)
     result['Category'].append('Annual Return')
     result['Value'].append(str(annual_return) + '%')
 
@@ -245,7 +243,7 @@ def pnl_summary(path):
     result['Value'].append(str(cumulative_return) + '%')
 
     # Annual volatility
-    annual_volatility = round(data['cumulative'].std() * np.sqrt(252), 2)
+    annual_volatility = round(data['pnl'].std() * np.sqrt(252), 2)
     result['Category'].append('Annual Volatility')
     result['Value'].append(str(annual_volatility) + '%')
 
