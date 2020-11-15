@@ -160,11 +160,7 @@ def upload_strategy():
     if "global_note" not in result.linter.stats or \
             result.linter.stats['global_note'] <= 0:
         logger.info("wrong file, remove")
-        # response = s3_client.list_objects_v2(
-        #     Bucket=bucket_name, Prefix=new_folder
-        # )
-        # for object in response['Contents']:
-        #     s3_client.delete_object(Bucket=bucket_name, Key=object['Key'])
+        
         shutil.rmtree(local_strategy_folder)
         return "Your strategy has error or is not able to run! \
             correct your file and upload again"
