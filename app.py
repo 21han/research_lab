@@ -171,7 +171,7 @@ def upload_strategy():
 
     # after the check is successful
     # upload to s3 bucket
-    filepath = upload_strategy_to_s3(file, bucket_name, strategy_folder)
+    filepath = upload_strategy_to_s3(local_path, bucket_name, strategy_folder)
     logger.info(f"file uploads to path {filepath}")
     score = result.linter.stats['global_note']
     
@@ -419,7 +419,7 @@ def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
     try:
         logger.info(f"uploading file: to path {upload_path}")
 
-        s3_client.upload_fileobj(
+        s3_client.upload_file(
             file,
             bucket_name,
             upload_path,
