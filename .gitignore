@@ -5,9 +5,13 @@ __pycache__/
 
 # cred file
 .cred
+.passwords
 
 # vscode file
 .vscode
 
 # local strategies
-strategies/*
+strategies/
+
+# ipy file for testing
+*.ipynb*
