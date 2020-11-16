@@ -5,10 +5,15 @@ import logging
 import os
 import secrets
 import shutil
-from datetime import datetime
-
+from utils import s3_util
+import flask
+import importlib
+import datetime
+import time
+from tqdm import trange
 import pandas as pd
 from PIL import Image
+import json
 
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
@@ -39,6 +44,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
+TOTAL_CAPITAL = 10**6
 
 # endpoint routes
 
@@ -274,6 +280,38 @@ def all_strategy():
     return render_template('strategies.html', df=all_user_strategies)
 
 
+def get_strategy_to_local(strategy_location):
+    """
+    get strategy from s3 to local
+    :param strategy_location: s3 loction
+    :return: local strategy file path
+    """
+
+    current_usr = 0  # TODO: Michael: please change this
+
+    s3 = s3_util.init_s3()
+
+    if "/" not in strategy_location:
+        raise ValueError("Invalid Strategy Location.")
+
+    s3_url_obj = s3_util.S3Url(strategy_location)
+
+    user_folder = f"strategies/user_id_{current_usr}"
+    if not os.path.exists(user_folder):
+        os.makedirs(user_folder)
+        open(f"{user_folder}/__init__.py", 'a').close()
+
+    local_strategy_path = f"{user_folder}/current_strategy.py"
+    logger.info(f"-- s3 bucket: {s3_url_obj.bucket} -- s3 key: {s3_url_obj.key}")
+
+    s3.Bucket(s3_url_obj.bucket).download_file(
+        s3_url_obj.key,
+        local_strategy_path
+    )
+
+    return local_strategy_path
+
+
 @app.route('/strategy')
 def display_strategy():
     """display select strategy with id
@@ -283,9 +321,102 @@ def display_strategy():
     """
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
-    with open(f"strategies/{strategy_location}/src/main.py") as f:
+
+    # step 1: aws cp file to local
+    local_strategy_path = get_strategy_to_local(strategy_location)
+
+    # step 2: display content
+    with open(local_strategy_path) as f:
         code_snippet = f.read()
-    return render_template('strategy.html', code=code_snippet)
+
+    return render_template('strategy.html', strategy_id=strategy_id, code=code_snippet, num_bars=1)
+
+
+@app.route('/backtest_progress')
+def backtest_progress():
+    """
+
+    :return:
+    """
+    strategy_id = request.args.get('id')
+    logger.info("backtest progress started")
+    current_usr = 0  # TODO Michael please help change this
+
+    s_module = importlib.import_module(f"strategies.user_id_{current_usr}.current_strategy")
+
+    n_days_back = 50
+    past_n_days = [datetime.datetime.today() - datetime.timedelta(days=i) for i in range(n_days_back)]
+    past_n_days = sorted(past_n_days)
+
+    def backtest():
+        position_df = {
+            'value': []
+        }
+        for d in trange(n_days_back):
+            one_tenth = n_days_back // 10
+            if d % one_tenth == 0:
+                time.sleep(1)
+            progress = {
+                0: min(100 * d // n_days_back, 100)
+            }
+            ret_string = f"data:{json.dumps(progress)}\n\n"
+            yield ret_string
+            day_x_position = s_module.Strategy().run()
+            day_x = past_n_days[d]
+            total_value_x = compute_total_value(day_x, day_x_position)
+            position_df['value'].append(total_value_x)
+
+        yield f"data:{json.dumps({0:100})}\n\n"
+
+        position_df = pd.DataFrame(position_df)
+        pnl_df = position_df.diff(-1)
+        pnl_df.index = past_n_days
+        pnl_df.dropna(inplace=True)
+
+        file_name = f'strategies/user_id_{current_usr}/backtest.csv'
+        pnl_df.to_csv(file_name, index=True)
+
+        bucket = 'coms4156-strategies'
+        key = f"{current_usr}/backtest_{strategy_id}.csv"
+
+        s3_client = s3_util.init_s3_client()
+        s3_client.upload_file(file_name, bucket, key)
+
+        update_backtest_db(strategy_id, bucket, key)
+
+    return flask.Response(backtest(), mimetype='text/event-stream')
+
+
+def update_backtest_db(strategy_id, bucket, key):
+    conn = rds.get_connection()
+    cursor = conn.cursor()
+    timestamp = datetime.datetime.now()
+
+    query = "REPLACE INTO backtest.backtests (strategy_id, backtest_id," \
+            "pnl_location, last_modified_date) \
+                    VALUES (%s,%s,%s,%s)"
+    cursor.execute(
+        query, (strategy_id, strategy_id, f"s3://{bucket}/{key}", timestamp)
+    )
+    conn.commit()
+
+
+
+def compute_total_value(day_x, day_x_position):
+    total_value = 0
+    from utils import mock_historical_data
+    for ticker, percent in day_x_position.items():
+        ticker_price = mock_historical_data.MockData.get_price(day_x, ticker)
+        total_value += ticker_price*percent*TOTAL_CAPITAL
+    return total_value
+
+
+@app.route('/backtest_strategy')
+def backtest_strategy():
+    strategy_id = request.args.get('id')
+    print(f"Hello {strategy_id}")
+    return ("nothing")
+
 
 
 # helper functions
@@ -326,17 +457,17 @@ def get_user_strategies(user_id):
 
 
 def get_strategy_location(strategy_id):
-    """[summary]
+    """obtain the location of the strategy
 
     Args:
-        strategy_id ([type]): [description]
+        strategy_id (int): strategy id
 
     Returns:
-        [type]: [description]
+        location: location of the strategy
     """
     conn = rds.get_connection()
     strategies = pd.read_sql(
-        f"select * from strategies where strategy_id = {strategy_id};",
+        f"select * from backtest.strategies where strategy_id = {strategy_id};",
         conn
     )
     s_loc = strategies['strategy_location'].iloc[0]

@@ -20,10 +20,11 @@
     </h3>
     <br><br>
     Start Backtest Strategy
-    <br><br>
 </div>
 
 <br><br>
+
+<!-- TODO: let's add scroll code feature here -->
 
 <div class="container">
 <pre class="prettyprint"><code>{{code}}</code>
@@ -32,23 +33,80 @@
 
 <br><br>
 
-<!--TODO: make progress bar dynamic -->
-<div class="container">
-    <div class="progress">
-    <div class="progress-bar" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">25%</div>
-    </div>
+<div class='container'>
+    <h3>Start Backtest</h3>
+        <form>
+            <a href=# id=backtest_button><button class='btn btn-default'>Start Backtest</button></a>
+        </form>
+
 </div>
 
 <br><br>
 
-<script>
-    function strategyButtonFunc(strategyId) {
-        window.open(
-            '/strategy?id=' + Number(strategyId),
-            '_blank' // <- This is what makes it open in a new window.
-        );
-    };
-</script>
+
+<div class='container'>
+    {% for bar in range(0,num_bars) %}
+        <div class="progress" style="width: 50%; margin: 50px;" >
+            <div class="progress-bar progress-bar-striped " role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%" id="prog_{{bar}}">
+                <span class="progress-bar-label" id="prog_{{bar}}_label">0%</span>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+
+<br><br>
+
 <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type=text/javascript>
+        $(function() {
+          $('a#backtest_button').on('click', function(e) {
+                console.log("Opening the SSE (Server Sent Event) connection")
+                alert('backtest has started');
+                let source = new EventSource("/backtest_progress?id={{strategy_id}}");
+                source.onmessage = function(event) {
+                    let sent_data = JSON.parse(event.data)
+                    console.log(sent_data)
+                    let done = true
+                    for (let i in sent_data) {
+                        console.log(i, sent_data[i])
+                        let qi = "#prog_"+i
+                        $(qi).css('width', sent_data[i]+'%').attr('aria-valuenow', sent_data[i]);
+                        let lqi = qi+"_label"
+                        $(lqi).text(sent_data[i]+'%');
+                        if (sent_data[i] < 99)
+                            done = false
+                    }
+                    if (done) {
+                        console.log("Closing the SSE connection")
+                        source.close()
+                        alert("backtest result has been saved")
+                    }
+
+                }
+            e.preventDefault()
+            $.getJSON('/backtest_strategy?id={{strategy_id}}',
+                function(data) {
+              //do nothing
+            });
+            return false;
+          });
+        });
+</script>
+
+
+<!--reference: https://github.com/sureshgaussian/flask_multiple_prog_bars/blob/master/templates/index.html -->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+<script>
+
+
+</script>
 
 </html>
