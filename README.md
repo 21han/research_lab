@@ -29,3 +29,11 @@ How to check style?
 ```
 pylint **/*.py
 ```
+
+# Coverage Check 
+To check testing coverage 
+
+```
+coverage run  --source=. -m pytest
+coverage report 
+```
