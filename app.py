@@ -1,6 +1,7 @@
 """
 app.py
 """
+import boto3
 import logging
 import os
 import secrets
@@ -31,6 +32,10 @@ from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
 from db_utils import rds
 
+# set the boto3 logging to critical to suppress warning
+logging.getLogger('botocore').setLevel(logging.CRITICAL)
+logging.getLogger('boto3').setLevel(logging.CRITICAL)
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -45,6 +50,14 @@ login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
 TOTAL_CAPITAL = 10**6
+
+# WARNING: is it suitable to create a client here
+s3_client = boto3.client(
+    "s3",
+    region_name=app.config["S3_REGION"],
+    aws_access_key_id=app.config["S3_ACCESS_KEY"],
+    aws_secret_access_key=app.config["S3_SECRET_KEY"]
+)
 
 # endpoint routes
 
@@ -94,6 +107,7 @@ def upload_strategy():
     Returns:
         string: return message of upload status with corresponding pylint score
     """
+    
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
@@ -119,35 +133,52 @@ def upload_strategy():
         return "File not found. Please upload it again"
 
     username = current_user.username
-    folder = 'strategies/' + username
-    if not os.path.exists(folder):
-        os.makedirs(folder)
 
     # get the number of folders
+    bucket_name = app.config["S3_BUCKET"]
+    response = s3_client.list_objects_v2(
+        Bucket=bucket_name, Prefix=username
+    )
 
-    cnt = len([_ for _ in os.listdir(folder)])
+    cnt = response["KeyCount"]
+    # '''
+    # WARNING: there is a maxKey in return which is 1000
+    # if there are more than 1000 in actual, 
+    # the return might be broken
+    # '''
+    
     new_folder = "strategy" + str(cnt + 1)
-
-    strategy_folder = os.path.join(folder, new_folder)
-    os.makedirs(strategy_folder)  # it must be new file
-
-    # name file to be main.py
-    filepath = os.path.join(strategy_folder, "main.py")
-    file.save(filepath)
-    result = Run([filepath], do_exit=False)
+    strategy_folder = os.path.join(username, new_folder)
+    
+    # keep a local copy of the file to run pylint
+    local_folder = os.path.join('strategies/', username)
+    if not os.path.exists(local_folder):
+       os.makedirs(local_folder)
+    
+    local_strategy_folder = os.path.join(local_folder, new_folder)
+    os.makedirs(local_strategy_folder)
+    local_path = os.path.join(local_strategy_folder, "main.py")
+    logger.info(f"local testing path is {local_path}")
+    file.save(local_path)
+    result = Run([local_path], do_exit=False)
 
     # may be need threshold
     logger.info(result.linter.stats)
     if "global_note" not in result.linter.stats or \
             result.linter.stats['global_note'] <= 0:
         logger.info("wrong file, remove")
-        shutil.rmtree(strategy_folder)
+        
+        shutil.rmtree(local_strategy_folder)
         return "Your strategy has error or is not able to run! \
             correct your file and upload again"
 
-    # store in database
-
+    # after the check is successful
+    # upload to s3 bucket
+    filepath = upload_strategy_to_s3(local_path, bucket_name, strategy_folder)
+    logger.info(f"file uploads to path {filepath}")
     score = result.linter.stats['global_note']
+    
+    # store in database
     conn = rds.get_connection()
     cursor = conn.cursor()
     timestamp = str(datetime.now())
@@ -476,13 +507,13 @@ def get_strategy_location(strategy_id):
 
 
 def allowed_file(filename):
-    """[summary]
+    """allowed file extension
 
     Args:
-        filename ([type]): [description]
+        filename ([string]): the file name including the extension
 
     Returns:
-        [type]: [description]
+        [bool]: yes for allowed, no for not allowed
     """
 
     # allowed file extenstion
@@ -490,6 +521,48 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config[
                "ALLOWED_EXTENSIONS"]
+
+
+def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
+    """
+    Notice that, in addition to ACL we set the ContentType key
+    in ExtraArgs to the file's content type. This is because by 
+    default, all files uploaded to an S3 bucket have their
+    content type set to binary/octet-stream, forcing the 
+    browser to prompt users to download the files instead of 
+    just reading them when accessed via a public URL (which can
+    become quite annoying and frustrating for images and pdfs
+    for example)
+
+    Args:
+        file ([type]): file object
+        bucket_name (str): bucket name
+        file_prefix (str): file prefix, like linxiao/strategy1
+        acl (str, optional): [description]. Defaults to "public-read".
+
+    Returns:
+        [str]: upload file path
+    """
+    upload_path = os.path.join(file_prefix, "main.py")
+    try:
+        logger.info(f"uploading file: to path {upload_path}")
+
+        s3_client.upload_file(
+            file,
+            bucket_name,
+            upload_path,
+            # ExtraArgs={
+            #     "ACL": acl,
+            #     "ContentType": file.content_type
+            # }
+        )
+
+    except Exception as e:
+        # This is a catch all exception, edit this part to fit your needs.
+        print("Something Happened: ", e)
+        return e
+
+    return "{}{}".format(app.config["S3_LOCATION"], upload_path)
 
 
 # Forms: registration, login, account
