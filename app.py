@@ -318,7 +318,32 @@ def display_strategy():
     return render_template('strategy.html', code=code_snippet)
 
 
+@app.route('/backtests')
+def display_backtest():
+    """display all the backtest results with selection option
+        Returns:
+            function: results.html
+        """
+    current_user_id = 0
+    user_backests = get_user_backtests(current_user_id)
+    del user_backests['pnl_location']
+    del user_backests['strategy_id']
+    del user_backests['backtest_id']
+    # display all user backtest results as a table on the U.I.
+    return render_template("results.html", df=user_backests)
+
+
 # helper functions
+
+def get_user_backtests(user_id):
+    """
+    Get backtest df from rds.
+    :param user_id: user id
+    :return: dataframe
+    """
+    backtests = rds.get_all_backtests(user_id)
+
+    return backtests
 
 
 def save_picture(form_picture):

@@ -2,9 +2,10 @@
 This file contains all the tests for the dash_app.py
 """
 
-from dash_plots import dash_app
+from ..dash_plots import dash_app
 import pandas as pd
 import numpy as np
+
 
 def test_annual_return():
     """

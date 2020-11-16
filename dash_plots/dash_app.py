@@ -1,9 +1,6 @@
 
 import numpy as np
 from dash import Dash
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
-import flask
-from werkzeug.serving import run_simple
 import plotly.express as px
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
@@ -11,31 +8,9 @@ import dash_html_components as html
 import pandas as pd
 import dash_table as dt
 
-
-app = flask.Flask(__name__)
-dash_app = Dash(__name__, server=app, url_base_pathname='/plots/')
-dash_app.layout = html.Div()
-
-
-@app.route('/')
-@app.route('/hello')
-def hello():
-    return 'hello world!'
-
-
-@app.route('/plots/')
-def render_reports():
-    """
-    Redirect to dosh route for visualization.
-    :return:
-    """
-    get_plot()
-    return flask.redirect('/dash_plot')
-
-
-app_embeds = DispatcherMiddleware(app, {
-    '/dash_plot': dash_app.server
-})
+#app = flask.Flask(__name__)
+app = Dash(__name__)
+app.layout = html.Div()
 
 
 def fig_update(file_path):
@@ -200,7 +175,7 @@ def construct_plot(strategy_names, pnl_paths):
     return html.Div([dcc.Tabs(contents)])
 
 
-def get_plot():
+def get_plot(backtest_ids):
     """
     Get two dictionaries, one mapping from strategy id to strategy name,
     another is mapping from strategy id to strategy location. And then construct dash plot.
@@ -216,7 +191,7 @@ def get_plot():
                  'STRG2': './pnl_holder/STRG2.csv',
                  'STRG3': './pnl_holder/STRG3.csv'}
 
-    dash_app.layout = construct_plot(strategy_names, pnl_paths)
+    app.layout = construct_plot(strategy_names, pnl_paths)
 
 
 def pnl_summary(data):
@@ -229,7 +204,6 @@ def pnl_summary(data):
     data['cumulative'] = data['pnl'].cumsum()
     result = {'Category': [], 'Value': []}
     total_date = data.shape[0]
-    print(total_date)
 
     return_value = (data['cumulative'].iloc[-1] - data['cumulative'].iloc[0]) / data['cumulative'].iloc[0]
     # Annual return
@@ -273,9 +247,10 @@ def pnl_summary(data):
     return pd.DataFrame(result)
 
 
-def main():
-    get_plot()
-    run_simple('0.0.0.0', 5000, app_embeds, use_reloader=True, use_debugger=True)
+def main(*args):
+    backtest_ids = [item for item in args]
+    get_plot(backtest_ids)
+    app.run_server(debug=True)
 
 
 if __name__ == "__main__":

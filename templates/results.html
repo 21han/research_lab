@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+          integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
+    <title>strategies</title>
+</head>
+
+<div class="container">
+    <br><br>
+    <h3>
+        Backtest Result Page
+    </h3>
+    <br><br>
+    Choose backtest result to visualize, max 5 results can be chosen.
+    <br><br>
+</div>
+
+<br><br>
+
+<div class="container">
+  <div class="row">
+    <div class="col-12">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th scope="col">Strategy Name</th>
+            <th scope="col">Last Modified Date</th>
+            <th scope="col">Select</th>
+          </tr>
+        </thead>
+        <tbody>
+         {% for i,value in df.iterrows() %}
+        <tr>
+            <td>{{value['strategy_name']}}</td>
+            <td>{{value['last_modified_date']}}</td>
+            <td>
+              <div class="custom-control custom-checkbox">
+                  <input type="checkbox" class="custom-control-input" id="customCheck1" checked>
+                  <label class="custom-control-label" for="customCheck1">1</label>
+              </div>
+            </td>
+        </tr>
+        {% endfor %}
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<br><br>
+
+<p>
+    <div class="col text-center">
+    <button id="viewButton" onclick="viewFunction()" type="button" class="btn btn-primary btn-lg"> View </button>
+    </div>
+</p>
+
+<script>
+    $("input:checkbox").click(function() {
+        var bol = $("input:checkbox:checked").length >= 5;
+        $("input:checkbox").not(":checked").attr("disabled",bol);
+    });
+</script>
+
+<script>
+    function viewFunction() {
+        var selected = $("input:checkbox:checked")
+
+        var exec = require('child_process').exec, child;
+        child = exec('echo ', strategyId_selected,
+            function (error, stdout, stderr) {
+                console.log('stdout: ' + stdout);
+                console.log('stderr: ' + stderr);
+                if (error !== null) {
+                     console.log('exec error: ' + error);
+                }
+            });
+        child();
+    };
+</script>
+
+
+
+</html>
