@@ -84,18 +84,25 @@ def about():
 
 @app.route("/home")
 @login_required
-# current page is login required, which means not logging will be redirected
 def home():
+    if current_user.is_authenticated:
+        return redirect('upload')
+
+
+@app.route("/upload")
+@login_required
+# current page is login required, which means not logging will be redirected
+def upload():
     """home page of the backtesting platform, login is required to access this page
 
     Returns:
         function: render home.html page with context of login user's username
     """
     context = {"username": current_user.username}
-    return render_template('home.html', **context)
+    return render_template('upload.html', **context)
 
 
-@app.route("/home", methods=["POST"])
+@app.route("/upload", methods=["POST"])
 @login_required
 def upload_strategy():
     """upload user strategy to alchemist database
@@ -165,18 +172,18 @@ def upload_strategy():
     if "global_note" not in result.linter.stats or \
             result.linter.stats['global_note'] <= 0:
         logger.info("wrong file, remove")
-        
+
         shutil.rmtree(local_strategy_folder)
         return "Your strategy has error or is not able to run! \
             correct your file and upload again"
 
     # after the check is successful
-    # TODO: in the future, remove the local file
+    
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(local_path, bucket_name, strategy_folder)
     logger.info(f"file uploads to path {filepath}")
     score = result.linter.stats['global_note']
-    
+
     # store in database
     conn = rds.get_connection()
     cursor = conn.cursor()
@@ -190,6 +197,7 @@ def upload_strategy():
     )
 
     conn.commit()
+    shutil.rmtree(local_strategy_folder)
     logger.info(f"affected rows = {cursor.rowcount}")
 
     message = "Your strategy " + name + \
@@ -266,7 +274,7 @@ def logout():
         function: redirect user to welcome page
     """
     logout_user()
-    return redirect(url_for('welcome'))
+    return redirect('welcome')
 
 
 @app.route("/account", methods=['GET', 'POST'])
@@ -298,16 +306,23 @@ def account():
 
 
 @app.route('/strategies')
+@login_required
 def all_strategy():
     """display all user strategy as a table on the U.I.
 
     Returns:
         function: render strategies.html page
     """
-    current_user_id = 0
+
+    current_user_id = current_user.id
+    username = current_user.username
     all_user_strategies = get_user_strategies(current_user_id)
     # display all user strategy as a table on the U.I.
-    return render_template('strategies.html', df=all_user_strategies)
+    return render_template(
+        'strategies.html',
+        df=all_user_strategies,
+        username=username
+    )
 
 
 def get_strategy_to_local(strategy_location):
@@ -360,6 +375,17 @@ def display_strategy():
         code_snippet = f.read()
 
     return render_template('strategy.html', strategy_id=strategy_id, code=code_snippet, num_bars=1)
+
+
+@app.route('/strategy', methods=["POST"])
+@login_required
+def delete_strategy():
+    strategy_id = request.args.get('id')
+    strategy_location = get_strategy_location(strategy_id)
+    
+    delete_strategy(strategy_location)
+    # redirect back to strategies
+    return redirect('strategies')
 
 
 @app.route('/backtest_progress')
@@ -429,7 +455,6 @@ def update_backtest_db(strategy_id, bucket, key):
         query, (strategy_id, strategy_id, f"s3://{bucket}/{key}", timestamp)
     )
     conn.commit()
-
 
 
 def compute_total_value(day_x, day_x_position):
@@ -563,15 +588,38 @@ def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
     return "{}{}".format(app.config["S3_LOCATION"], upload_path)
 
 
-def delete_strategy_in_s3(filepath):
-    """delete a strategy in s3
+def delete_strategy(filepath):
+    """delete a strategy
 
     Args:
-        filepath (s3): real strategy path in s3, which is the 
-        same as database
-    """
-    pass
+        filepath (s3): real strategy path in s3, which is
+        the same as database
 
+    ASSUME THE FILEPATH is always valid
+    NOTE: Need to delete both s3 and database
+    """
+    conn = rds.get_connection()
+    bucket_name = app.config["S3_BUCKET"]
+    split_path = filepath.split('/')
+    prefix = "/".join(split_path[3:])
+    
+    response = s3_client.list_objects_v2(
+        Bucket=bucket_name, Prefix=prefix
+    )
+    object_cnt = response["KeyCount"]
+    object = response['Contents'][0]  # assume only one match
+    logger.info(f"affected objects = {object_cnt}")
+    logger.info("Delete file from AWS")
+    s3_client.delete_object(Bucket=bucket_name, Key=object['Key'])
+    logger.info("Delete file from AWS")
+    cursor = conn.cursor()
+    query = "DELETE FROM backtest.strategies \
+                WHERE strategy_location = %s"
+    cursor.execute(query, (filepath,))
+    conn.commit()
+    logger.info(f"affected rows = {cursor.rowcount}")
+    logger.info("Delete file from Database")
+    
 
 # Forms: registration, login, account
 
