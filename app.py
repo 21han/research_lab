@@ -6,7 +6,7 @@ import logging
 import os
 import secrets
 import shutil
-from utils import s3_util
+from utils import s3_util, rds
 import flask
 import importlib
 import datetime
@@ -30,7 +30,8 @@ from pylint.lint import Run
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-from db_utils import rds
+
+# from db_utils import rds # migrate to utils
 
 # set the boto3 logging to critical to suppress warning
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
@@ -51,13 +52,8 @@ login_manager.login_message_category = 'info'
 
 TOTAL_CAPITAL = 10**6
 
-# WARNING: is it suitable to create a client here
-s3_client = boto3.client(
-    "s3",
-    region_name=app.config["S3_REGION"],
-    aws_access_key_id=app.config["S3_ACCESS_KEY"],
-    aws_secret_access_key=app.config["S3_SECRET_KEY"]
-)
+# create an s3 client
+s3_client = s3_util.init_s3_client()
 
 # endpoint routes
 
@@ -133,11 +129,13 @@ def upload_strategy():
         return "File not found. Please upload it again"
 
     username = current_user.username
-
+    userid = str(current_user.id)
     # get the number of folders
     bucket_name = app.config["S3_BUCKET"]
+    
+    # path: s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
     response = s3_client.list_objects_v2(
-        Bucket=bucket_name, Prefix=username
+        Bucket=bucket_name, Prefix=userid
     )
 
     cnt = response["KeyCount"]
@@ -148,16 +146,16 @@ def upload_strategy():
     # '''
     
     new_folder = "strategy" + str(cnt + 1)
-    strategy_folder = os.path.join(username, new_folder)
+    strategy_folder = os.path.join(userid, new_folder)
     
     # keep a local copy of the file to run pylint
-    local_folder = os.path.join('strategies/', username)
+    local_folder = os.path.join('strategies/', userid)
     if not os.path.exists(local_folder):
        os.makedirs(local_folder)
     
     local_strategy_folder = os.path.join(local_folder, new_folder)
     os.makedirs(local_strategy_folder)
-    local_path = os.path.join(local_strategy_folder, "main.py")
+    local_path = os.path.join(local_strategy_folder, file.filename)
     logger.info(f"local testing path is {local_path}")
     file.save(local_path)
     result = Run([local_path], do_exit=False)
@@ -173,6 +171,7 @@ def upload_strategy():
             correct your file and upload again"
 
     # after the check is successful
+    # TODO: in the future, remove the local file
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(local_path, bucket_name, strategy_folder)
     logger.info(f"file uploads to path {filepath}")
@@ -181,7 +180,7 @@ def upload_strategy():
     # store in database
     conn = rds.get_connection()
     cursor = conn.cursor()
-    timestamp = str(datetime.now())
+    timestamp = str(datetime.datetime.now())
 
     query = "INSERT INTO backtest.strategies (user_id, strategy_location, \
             last_modified_date, last_modified_user, strategy_name) \
@@ -448,8 +447,6 @@ def backtest_strategy():
     print(f"Hello {strategy_id}")
     return ("nothing")
 
-
-
 # helper functions
 
 
@@ -543,7 +540,8 @@ def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
     Returns:
         [str]: upload file path
     """
-    upload_path = os.path.join(file_prefix, "main.py")
+    filename = file.split('/')[-1]
+    upload_path = os.path.join(file_prefix, filename)
     try:
         logger.info(f"uploading file: to path {upload_path}")
 
@@ -563,6 +561,16 @@ def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
         return e
 
     return "{}{}".format(app.config["S3_LOCATION"], upload_path)
+
+
+def delete_strategy_in_s3(filepath):
+    """delete a strategy in s3
+
+    Args:
+        filepath (s3): real strategy path in s3, which is the 
+        same as database
+    """
+    pass
 
 
 # Forms: registration, login, account

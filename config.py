@@ -3,7 +3,8 @@ import pymysql
 
 S3_BUCKET                       = "coms4156-strategies"
 DB_HOST                         = os.environ.get('ALCHEMIST_RDB_HOST')
-S3_LOCATION                     = 'http://{}.s3.amazonaws.com/'.format(S3_BUCKET)
+S3_LOCATION                     = 's3://{}/'.format(S3_BUCKET)
+S3_LOCATION_HTTP                = 'http://{}.s3.amazonaws.com/'.format(S3_BUCKET)
 SECRET_KEY                      = os.urandom(16)
 USER_SERVICE_USER               = os.environ.get('USER_SERVICE_USER')
 USER_SERVICE_PASSWORD           = os.environ.get('USER_SERVICE_PASSWORD')
