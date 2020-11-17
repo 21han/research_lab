@@ -16,10 +16,10 @@
 <div class="container">
     <br><br>
     <h3>
-        Backtest Result Page
+        Backtest Selection Page
     </h3>
     <br><br>
-    Choose backtest result to visualize, max 5 results can be chosen.
+    Select backtest result(s) to visualize, max 5 results can be selected.
     <br><br>
 </div>
 
@@ -31,6 +31,8 @@
       <table class="table table-bordered">
         <thead>
           <tr>
+
+              <th scope="col">Strategy Id</th>
             <th scope="col">Strategy Name</th>
             <th scope="col">Last Modified Date</th>
             <th scope="col">Select</th>
@@ -39,13 +41,14 @@
         <tbody>
          {% for i,value in df.iterrows() %}
         <tr>
+            <td>{{value['strategy_id']}}</td>
             <td>{{value['strategy_name']}}</td>
             <td>{{value['last_modified_date']}}</td>
             <td>
-              <div class="custom-control custom-checkbox">
-                  <input type="checkbox" class="custom-control-input" id="customCheck1" checked>
-                  <label class="custom-control-label" for="customCheck1">1</label>
-              </div>
+              <div class="form-group form-check">
+                  <input type="checkbox" class="form-check-input" id="checkbox" value={{ value['strategy_id'] }}>
+                  <label class="form-check-label" for="exampleCheck1"> {{i}} </label>
+            </div>
             </td>
         </tr>
         {% endfor %}
@@ -71,22 +74,16 @@
     });
 </script>
 
+
 <script>
     function viewFunction() {
-        var selected = $("input:checkbox:checked")
-
-        var exec = require('child_process').exec, child;
-        child = exec('echo ', strategyId_selected,
-            function (error, stdout, stderr) {
-                console.log('stdout: ' + stdout);
-                console.log('stderr: ' + stderr);
-                if (error !== null) {
-                     console.log('exec error: ' + error);
-                }
-            });
-        child();
+        window.open(
+          '/strategy?id=') ,
+          '_blank' // <- This is what makes it open in a new window.
+        );
     };
 </script>
+
 
 
 

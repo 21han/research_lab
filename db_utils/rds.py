@@ -53,7 +53,7 @@ def get_all_backtests(user_id):
         f" FROM backtest.strategies s " 
         f" LEFT JOIN backtest.backtests b ON s.strategy_id = b.strategy_id "
         f" WHERE s.user_id = {user_id} AND b.pnl_location is not null"
-        f" ORDER BY b.last_modified_date;.",
+        f" ORDER BY b.last_modified_date;",
         conn
     )
 

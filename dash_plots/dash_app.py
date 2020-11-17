@@ -7,6 +7,8 @@ import dash_core_components as dcc
 import dash_html_components as html
 import pandas as pd
 import dash_table as dt
+import sys
+
 
 #app = flask.Flask(__name__)
 app = Dash(__name__)
@@ -254,4 +256,5 @@ def main(*args):
 
 
 if __name__ == "__main__":
+    print(sys.argv)
     main()

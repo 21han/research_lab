@@ -105,3 +105,4 @@ def test_kurtosis():
     result = dash_app.pnl_summary(data)
     kui = str(round(data['pnl'].kurtosis(), 2))
     assert kui == result['Value'].iloc[6]
+

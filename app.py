@@ -326,9 +326,6 @@ def display_backtest():
         """
     current_user_id = 0
     user_backests = get_user_backtests(current_user_id)
-    del user_backests['pnl_location']
-    del user_backests['strategy_id']
-    del user_backests['backtest_id']
     # display all user backtest results as a table on the U.I.
     return render_template("results.html", df=user_backests)
 
