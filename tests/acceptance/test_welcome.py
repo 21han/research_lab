@@ -5,7 +5,7 @@ test / or /welcome
 from .test_baseclass import TestBase
 
 
-class TestLoginLogout(TestBase):
+class TestRoot(TestBase):
     def test_root_directory(self):
         """
         GET /

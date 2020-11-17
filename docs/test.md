@@ -80,7 +80,7 @@ for example:
 ```python
 from .test_baseclass import TestBase
 
-class TestLoginLogout(TestBase):
+class TestRoot(TestBase):
 ```
 
 with this, you can directly use the self.app to send requests then
@@ -91,7 +91,7 @@ for example:
 from .test_baseclass import TestBase
 
 
-class TestLoginLogout(TestBase):
+class TestRoot(TestBase):
     def test_root_directory(self):
         """
         GET /
