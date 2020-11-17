@@ -740,6 +740,9 @@ class User(db.Model, UserMixin):
         return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
+def stop():
+    pass
+
 def main():
     """
     run app

@@ -1,7 +1,8 @@
 """
 Please place all test cases for app.py here.
 """
-from ..utils import rds
+from utils import rds
+
 
 def test_always_true():
     """
