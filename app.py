@@ -6,10 +6,15 @@ import logging
 import os
 import secrets
 import shutil
-from datetime import datetime
-
+from utils import s3_util, rds
+import flask
+import importlib
+import datetime
+import time
+from tqdm import trange
 import pandas as pd
 from PIL import Image
+import json
 
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
@@ -25,7 +30,6 @@ from pylint.lint import Run
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-from db_utils import rds
 
 # set the boto3 logging to critical to suppress warning
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
@@ -44,13 +48,10 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
-# WARNING: is it suitable to create a client here
-s3_client = boto3.client(
-    "s3",
-    region_name=app.config["S3_REGION"],
-    aws_access_key_id=app.config["S3_ACCESS_KEY"],
-    aws_secret_access_key=app.config["S3_SECRET_KEY"]
-)
+TOTAL_CAPITAL = 10**6
+
+# create an s3 client
+s3_client = s3_util.init_s3_client()
 
 # endpoint routes
 
@@ -81,18 +82,25 @@ def about():
 
 @app.route("/home")
 @login_required
-# current page is login required, which means not logging will be redirected
 def home():
+    if current_user.is_authenticated:
+        return redirect('upload')
+
+
+@app.route("/upload")
+@login_required
+# current page is login required, which means not logging will be redirected
+def upload():
     """home page of the backtesting platform, login is required to access this page
 
     Returns:
         function: render home.html page with context of login user's username
     """
     context = {"username": current_user.username}
-    return render_template('home.html', **context)
+    return render_template('upload.html', **context)
 
 
-@app.route("/home", methods=["POST"])
+@app.route("/upload", methods=["POST"])
 @login_required
 def upload_strategy():
     """upload user strategy to alchemist database
@@ -126,11 +134,13 @@ def upload_strategy():
         return "File not found. Please upload it again"
 
     username = current_user.username
-
+    userid = str(current_user.id)
     # get the number of folders
     bucket_name = app.config["S3_BUCKET"]
+    
+    # path: s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
     response = s3_client.list_objects_v2(
-        Bucket=bucket_name, Prefix=username
+        Bucket=bucket_name, Prefix=userid
     )
 
     cnt = response["KeyCount"]
@@ -141,16 +151,16 @@ def upload_strategy():
     # '''
     
     new_folder = "strategy" + str(cnt + 1)
-    strategy_folder = os.path.join(username, new_folder)
+    strategy_folder = os.path.join(userid, new_folder)
     
     # keep a local copy of the file to run pylint
-    local_folder = os.path.join('strategies/', username)
+    local_folder = os.path.join('strategies/', userid)
     if not os.path.exists(local_folder):
        os.makedirs(local_folder)
     
     local_strategy_folder = os.path.join(local_folder, new_folder)
     os.makedirs(local_strategy_folder)
-    local_path = os.path.join(local_strategy_folder, "main.py")
+    local_path = os.path.join(local_strategy_folder, file.filename)
     logger.info(f"local testing path is {local_path}")
     file.save(local_path)
     result = Run([local_path], do_exit=False)
@@ -160,21 +170,22 @@ def upload_strategy():
     if "global_note" not in result.linter.stats or \
             result.linter.stats['global_note'] <= 0:
         logger.info("wrong file, remove")
-        
+
         shutil.rmtree(local_strategy_folder)
         return "Your strategy has error or is not able to run! \
             correct your file and upload again"
 
     # after the check is successful
+    
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(local_path, bucket_name, strategy_folder)
     logger.info(f"file uploads to path {filepath}")
     score = result.linter.stats['global_note']
-    
+
     # store in database
     conn = rds.get_connection()
     cursor = conn.cursor()
-    timestamp = str(datetime.now())
+    timestamp = str(datetime.datetime.now())
 
     query = "INSERT INTO backtest.strategies (user_id, strategy_location, \
             last_modified_date, last_modified_user, strategy_name) \
@@ -184,6 +195,7 @@ def upload_strategy():
     )
 
     conn.commit()
+    shutil.rmtree(local_strategy_folder)
     logger.info(f"affected rows = {cursor.rowcount}")
 
     message = "Your strategy " + name + \
@@ -260,7 +272,7 @@ def logout():
         function: redirect user to welcome page
     """
     logout_user()
-    return redirect(url_for('welcome'))
+    return redirect('welcome')
 
 
 @app.route("/account", methods=['GET', 'POST'])
@@ -292,16 +304,55 @@ def account():
 
 
 @app.route('/strategies')
+@login_required
 def all_strategy():
     """display all user strategy as a table on the U.I.
 
     Returns:
         function: render strategies.html page
     """
-    current_user_id = 0
+
+    current_user_id = current_user.id
+    username = current_user.username
     all_user_strategies = get_user_strategies(current_user_id)
     # display all user strategy as a table on the U.I.
-    return render_template('strategies.html', df=all_user_strategies)
+    return render_template(
+        'strategies.html',
+        df=all_user_strategies,
+        username=username
+    )
+
+
+def get_strategy_to_local(strategy_location):
+    """
+    get strategy from s3 to local
+    :param strategy_location: s3 loction
+    :return: local strategy file path
+    """
+
+    current_usr = 0  # TODO: Michael: please change this
+
+    s3 = s3_util.init_s3()
+
+    if "/" not in strategy_location:
+        raise ValueError("Invalid Strategy Location.")
+
+    s3_url_obj = s3_util.S3Url(strategy_location)
+
+    user_folder = f"strategies/user_id_{current_usr}"
+    if not os.path.exists(user_folder):
+        os.makedirs(user_folder)
+        open(f"{user_folder}/__init__.py", 'a').close()
+
+    local_strategy_path = f"{user_folder}/current_strategy.py"
+    logger.info(f"-- s3 bucket: {s3_url_obj.bucket} -- s3 key: {s3_url_obj.key}")
+
+    s3.Bucket(s3_url_obj.bucket).download_file(
+        s3_url_obj.key,
+        local_strategy_path
+    )
+
+    return local_strategy_path
 
 
 @app.route('/strategy')
@@ -313,10 +364,111 @@ def display_strategy():
     """
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
-    with open(f"strategies/{strategy_location}/src/main.py") as f:
-        code_snippet = f.read()
-    return render_template('strategy.html', code=code_snippet)
 
+    # step 1: aws cp file to local
+    local_strategy_path = get_strategy_to_local(strategy_location)
+
+    # step 2: display content
+    with open(local_strategy_path) as f:
+        code_snippet = f.read()
+
+    return render_template('strategy.html', strategy_id=strategy_id, code=code_snippet, num_bars=1)
+
+
+@app.route('/strategy', methods=["POST"])
+@login_required
+def delete_strategy():
+    strategy_id = request.args.get('id')
+    strategy_location = get_strategy_location(strategy_id)
+    
+    delete_strategy(strategy_location)
+    # redirect back to strategies
+    return redirect('strategies')
+
+
+@app.route('/backtest_progress')
+def backtest_progress():
+    """
+
+    :return:
+    """
+    strategy_id = request.args.get('id')
+    logger.info("backtest progress started")
+    current_usr = 0  # TODO Michael please help change this
+
+    s_module = importlib.import_module(f"strategies.user_id_{current_usr}.current_strategy")
+
+    n_days_back = 50
+    past_n_days = [datetime.datetime.today() - datetime.timedelta(days=i) for i in range(n_days_back)]
+    past_n_days = sorted(past_n_days)
+
+    def backtest():
+        position_df = {
+            'value': []
+        }
+        for d in trange(n_days_back):
+            one_tenth = n_days_back // 10
+            if d % one_tenth == 0:
+                time.sleep(1)
+            progress = {
+                0: min(100 * d // n_days_back, 100)
+            }
+            ret_string = f"data:{json.dumps(progress)}\n\n"
+            yield ret_string
+            day_x_position = s_module.Strategy().run()
+            day_x = past_n_days[d]
+            total_value_x = compute_total_value(day_x, day_x_position)
+            position_df['value'].append(total_value_x)
+
+        yield f"data:{json.dumps({0:100})}\n\n"
+
+        position_df = pd.DataFrame(position_df)
+        pnl_df = position_df.diff(-1)
+        pnl_df.index = past_n_days
+        pnl_df.dropna(inplace=True)
+
+        file_name = f'strategies/user_id_{current_usr}/backtest.csv'
+        pnl_df.to_csv(file_name, index=True)
+
+        bucket = 'coms4156-strategies'
+        key = f"{current_usr}/backtest_{strategy_id}.csv"
+
+        s3_client = s3_util.init_s3_client()
+        s3_client.upload_file(file_name, bucket, key)
+
+        update_backtest_db(strategy_id, bucket, key)
+
+    return flask.Response(backtest(), mimetype='text/event-stream')
+
+
+def update_backtest_db(strategy_id, bucket, key):
+    conn = rds.get_connection()
+    cursor = conn.cursor()
+    timestamp = datetime.datetime.now()
+
+    query = "REPLACE INTO backtest.backtests (strategy_id, backtest_id," \
+            "pnl_location, last_modified_date) \
+                    VALUES (%s,%s,%s,%s)"
+    cursor.execute(
+        query, (strategy_id, strategy_id, f"s3://{bucket}/{key}", timestamp)
+    )
+    conn.commit()
+
+
+def compute_total_value(day_x, day_x_position):
+    total_value = 0
+    from utils import mock_historical_data
+    for ticker, percent in day_x_position.items():
+        ticker_price = mock_historical_data.MockData.get_price(day_x, ticker)
+        total_value += ticker_price*percent*TOTAL_CAPITAL
+    return total_value
+
+
+@app.route('/backtest_strategy')
+def backtest_strategy():
+    strategy_id = request.args.get('id')
+    print(f"Hello {strategy_id}")
+    return ("nothing")
 
 @app.route('/backtests')
 def display_backtest():
@@ -378,17 +530,17 @@ def get_user_strategies(user_id):
 
 
 def get_strategy_location(strategy_id):
-    """[summary]
+    """obtain the location of the strategy
 
     Args:
-        strategy_id ([type]): [description]
+        strategy_id (int): strategy id
 
     Returns:
-        [type]: [description]
+        location: location of the strategy
     """
     conn = rds.get_connection()
     strategies = pd.read_sql(
-        f"select * from strategies where strategy_id = {strategy_id};",
+        f"select * from backtest.strategies where strategy_id = {strategy_id};",
         conn
     )
     s_loc = strategies['strategy_location'].iloc[0]
@@ -433,7 +585,8 @@ def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
     Returns:
         [str]: upload file path
     """
-    upload_path = os.path.join(file_prefix, "main.py")
+    filename = file.split('/')[-1]
+    upload_path = os.path.join(file_prefix, filename)
     try:
         logger.info(f"uploading file: to path {upload_path}")
 
@@ -454,6 +607,39 @@ def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
 
     return "{}{}".format(app.config["S3_LOCATION"], upload_path)
 
+
+def delete_strategy(filepath):
+    """delete a strategy
+
+    Args:
+        filepath (s3): real strategy path in s3, which is
+        the same as database
+
+    ASSUME THE FILEPATH is always valid
+    NOTE: Need to delete both s3 and database
+    """
+    conn = rds.get_connection()
+    bucket_name = app.config["S3_BUCKET"]
+    split_path = filepath.split('/')
+    prefix = "/".join(split_path[3:])
+    
+    response = s3_client.list_objects_v2(
+        Bucket=bucket_name, Prefix=prefix
+    )
+    object_cnt = response["KeyCount"]
+    object = response['Contents'][0]  # assume only one match
+    logger.info(f"affected objects = {object_cnt}")
+    logger.info("Delete file from AWS")
+    s3_client.delete_object(Bucket=bucket_name, Key=object['Key'])
+    logger.info("Delete file from AWS")
+    cursor = conn.cursor()
+    query = "DELETE FROM backtest.strategies \
+                WHERE strategy_location = %s"
+    cursor.execute(query, (filepath,))
+    conn.commit()
+    logger.info(f"affected rows = {cursor.rowcount}")
+    logger.info("Delete file from Database")
+    
 
 # Forms: registration, login, account
 

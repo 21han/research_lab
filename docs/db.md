@@ -81,7 +81,7 @@ test connection, which is in the below, and it should be successful
 Python 3.8.5 (default, Sep  4 2020, 02:22:02) 
 [Clang 10.0.0 ] :: Anaconda, Inc. on darwin
 Type "help", "copyright", "credits" or "license" for more information.
->>> from db_utils import rds
+>>> from utils import rds
 >>> rds.get_connection()
 <pymysql.connections.Connection object at 0x7f9888132d60>
 >>> exit()
