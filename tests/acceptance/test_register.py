@@ -35,12 +35,13 @@ class TestRegister(TestBase):
         response = self.app.post(
             "/register",
             data={
-                "username": "00000",
-                "email": "00000@000.com",
+                "username": "000",
+                "email": "000@0.com",
                 "password": "000",
                 "confirm_password": "000"
             },
         )
+
 
         self.assertEqual(response.status_code, 302,
                          "Unable to register for the test user")
