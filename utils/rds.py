@@ -58,3 +58,23 @@ def get_all_backtests(user_id):
     )
 
     return backtest_df
+
+def get_all_loations(strategy_ids):
+    """
+        get all backtest results of a user
+        :param user_id: current user
+        :return: backtest results in pd.dataframe
+        """
+    conn = get_connection()
+    ids = "( " + " ".join(strategy_ids) + " )"
+
+    backtest_df = pd.read_sql(
+        f" SELECT s.strategy_name, b.pnl_location"
+        f" FROM backtest.strategies s"
+        f" LEFT JOIN backtest.backtests b ON s.strategy_id = b.strategy_id" 
+        f" WHERE b.strategy_id in {ids} AND b.pnl_location is not null" 
+        f" ORDER BY b.last_modified_date; ",
+        conn
+    )
+
+    return backtest_df

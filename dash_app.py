@@ -1,4 +1,4 @@
-
+import os, sys
 import numpy as np
 from dash import Dash
 import plotly.express as px
@@ -7,10 +7,17 @@ import dash_core_components as dcc
 import dash_html_components as html
 import pandas as pd
 import dash_table as dt
-import sys
-
+from utils import s3_util, rds
+import flask
 
 #app = flask.Flask(__name__)
+#app.config.from_object("config")
+
+# create an s3 client
+s3_client = s3_util.init_s3_client()
+bucket_name = "coms4156-strategies"
+
+# app = flask.Flask(__name__)
 app = Dash(__name__)
 app.layout = html.Div()
 
@@ -22,8 +29,15 @@ def fig_update(file_path):
     :return: fig, the styled graph.
     """
     graph_data = []
-    file_path = file_path
-    pnl_df = pd.read_csv(file_path)
+    split_path = file_path.split('/')
+    prefix = "/".join(split_path[3:])
+
+    csv_obj = s3_client.get_object(Bucket=bucket_name, Key=prefix)
+    pnl_df = pd.read_csv(csv_obj['Body'])
+
+    pnl_df.rename(columns={'Unnamed: 0': 'date', 'value': 'pnl'}, inplace=True)
+
+    # pnl_df = pd.read_csv(file_path)
     pnl_df['pnl'] = pnl_df['pnl'].cumsum()
     graph_data.append({'x': pnl_df['date'], 'y': pnl_df['pnl']})
     fig = px.line(pnl_df, x='date', y='pnl')
@@ -41,7 +55,7 @@ def fig_update(file_path):
         )
     )
 
-    return fig
+    return fig, pnl_df
 
 
 def make_table(data):
@@ -87,8 +101,8 @@ def construct_plot(strategy_names, pnl_paths):
     :param pnl_paths: A dictionary to map strategy id to corresponding pnl path of csv file. 
                         Key is strategy id, value is a path string.
     :return: Lively dash layout.
-    """ 
-    
+    """
+
     options = []
     for name in strategy_names.keys():
         options.append({'label': '{}-{}'.format(strategy_names[name], name), 'value': strategy_names[name]})
@@ -111,8 +125,8 @@ def construct_plot(strategy_names, pnl_paths):
 
     contents = []
     for str_key, str_name in strategy_names.items():
-        pnl_fig = fig_update(pnl_paths[str_key])
-        table_df = pnl_summary(pd.read_csv(pnl_paths[str_key]))
+        pnl_fig, pnl_df = fig_update(pnl_paths[str_key])
+        table_df = pnl_summary(pnl_df)
 
         contents.append(
             dcc.Tab(label=str_name, children=[
@@ -177,21 +191,19 @@ def construct_plot(strategy_names, pnl_paths):
     return html.Div([dcc.Tabs(contents)])
 
 
-def get_plot(backtest_ids):
+def get_plot(strategy_ids):
     """
     Get two dictionaries, one mapping from strategy id to strategy name,
     another is mapping from strategy id to strategy location. And then construct dash plot.
     :return:
     """
-    # Hard-code here for examples, will modify as sql query.
+    backtests = rds.get_all_loations(strategy_ids)
 
-    strategy_names = {'STRG1': 'Strategy1',
-                      'STRG2': 'Strategy2',
-                      'STRG3': 'Strategy3'}
-
-    pnl_paths = {'STRG1': './pnl_holder/STRG1.csv',
-                 'STRG2': './pnl_holder/STRG2.csv',
-                 'STRG3': './pnl_holder/STRG3.csv'}
+    strategy_names = {}
+    pnl_paths = {}
+    for idx, id in enumerate(strategy_ids):
+        strategy_names[id] = backtests['strategy_name'].iloc[idx]
+        pnl_paths[id] = backtests['pnl_location'].iloc[idx]
 
     app.layout = construct_plot(strategy_names, pnl_paths)
 
@@ -218,19 +230,19 @@ def pnl_summary(data):
     result['Category'].append('Cumulative Return')
     result['Value'].append(str(cumulative_return) + '%')
 
-    # Annual volatility
-    annual_volatility = round(data['pnl'].std() * np.sqrt(252), 2)
+    # Annual volatility  -->  every value / 10**6
+    annual_volatility = round(data['pnl'].std() * np.sqrt(365), 2)
     result['Category'].append('Annual Volatility')
     result['Value'].append(str(annual_volatility) + '%')
 
     # Sharpe ratio
     r = data['cumulative'].diff()
-    sr = round(r.mean() / r.std() * np.sqrt(252), 2)
+    sr = round(r.mean() / r.std() * np.sqrt(365), 2)
     result['Category'].append('Sharpe Ratio')
     result['Value'].append(str(sr))
 
     # Max Dropdown
-    md = round( (np.max(data['pnl']) - np.min(data['pnl'])) / np.max(data['pnl']), 2)
+    md = round((np.max(data['pnl']) - np.min(data['pnl'])) / np.max(data['pnl']), 2)
     result['Category'].append('Max Dropdown')
     result['Value'].append(str(md))
 
@@ -250,11 +262,12 @@ def pnl_summary(data):
 
 
 def main(*args):
-    backtest_ids = [item for item in args]
-    get_plot(backtest_ids)
+
+    ids = [item for item in args[0][1:]]
+    get_plot(ids)
     app.run_server(debug=True)
 
 
-if __name__ == "__main__":
-    print(sys.argv)
-    main()
+#if __name__ == "__main__":
+#    print(sys.argv)
+#    main(sys.argv)
