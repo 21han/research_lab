@@ -10,16 +10,14 @@ import dash_table as dt
 from utils import s3_util, rds
 import flask
 
-#app = flask.Flask(__name__)
-#app.config.from_object("config")
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 bucket_name = "coms4156-strategies"
 
 # app = flask.Flask(__name__)
-app = Dash(__name__)
-app.layout = html.Div()
+dash_app = Dash(__name__)
+dash_app.layout = html.Div()
 
 
 def fig_update(file_path):
@@ -29,6 +27,7 @@ def fig_update(file_path):
     :return: fig, the styled graph.
     """
     graph_data = []
+
     split_path = file_path.split('/')
     prefix = "/".join(split_path[3:])
 
@@ -197,15 +196,15 @@ def get_plot(strategy_ids):
     another is mapping from strategy id to strategy location. And then construct dash plot.
     :return:
     """
-    backtests = rds.get_all_loations(strategy_ids)
 
+    backtests = rds.get_all_loations(strategy_ids)
     strategy_names = {}
     pnl_paths = {}
     for idx, id in enumerate(strategy_ids):
         strategy_names[id] = backtests['strategy_name'].iloc[idx]
         pnl_paths[id] = backtests['pnl_location'].iloc[idx]
 
-    app.layout = construct_plot(strategy_names, pnl_paths)
+    dash_app.layout = construct_plot(strategy_names, pnl_paths)
 
 
 def pnl_summary(data):
@@ -261,13 +260,19 @@ def pnl_summary(data):
     return pd.DataFrame(result)
 
 
-def main(*args):
-
-    ids = [item for item in args[0][1:]]
+def call_dash(*args):
+    """
+    Call dash process and construct plot.
+    :param args: args should be ids, like 15, 20, 24
+    :return:
+    """
+    ids = [str(item) for item in args[0]]
     get_plot(ids)
-    app.run_server(debug=True)
+
+    #app1.run(host='127.0.0.1', port=8050, debug=False, threaded=True)
+    dash_app.run_server(host='127.0.0.1', port=8050, debug=False, threaded=True)
 
 
-#if __name__ == "__main__":
+if __name__ == "__main__":
 #    print(sys.argv)
-#    main(sys.argv)
+    call_dash(sys.argv)
