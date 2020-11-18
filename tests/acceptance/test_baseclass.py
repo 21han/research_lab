@@ -17,6 +17,7 @@ class TestBase(unittest.TestCase):
         This function runs once before each member function unit test.
         """
         app.config['TESTING'] = True
+        app.config['WTF_CSRF_ENABLED'] = False
         self.app = app.test_client()
         self.app_context = app.app_context()
         self.app_context.push()

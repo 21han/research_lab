@@ -13,7 +13,7 @@ class TestLoginLogout(TestBase):
         Functions that start with "test" are automatically run by the unittest
         framwork.  The framework also takes care of running setUp() before each
         member function test begins and running tearDown() after each ends.
-        """ 
+        """
         response = self.app.get("/home")
         self.assertEqual(response.status_code, 302,
                          "/ did not redirect to login when user\
@@ -36,21 +36,25 @@ class TestLoginLogout(TestBase):
 
     def test_login(self):
         """login test users"""
+        response = self.app.get(
+            "/login"
+        )
+        
         response = self.app.post(
             "/login",
-            data={"email": "testuser@testuser.com", "password": "testuser"},
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
         )
-        
+
         self.assertEqual(response.status_code, 302,
                          "Unable to login for the test user")
-        
+
         parsed_url = urlparse(response.location)
         path = parsed_url.path
-        
+
         # right now, home is redirected to upload page
         self.assertEqual(
-            path, "/upload",
-            "Redirect location is not /upload"
+            path, "/home",
+            "Redirect location is not /home"
         )
-
-
