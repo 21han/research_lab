@@ -20,8 +20,17 @@ class MockData:
         'ATOM'
     }  # example trade universe
 
+    balance = 10**6  ## sample balance to mock account info
+
     def __init__(self):
         pass
+
+    def get_balance(self):
+        """
+        return current balance
+        :return:
+        """
+        return self.balance
 
     @staticmethod
     def get_price(date, ticker):
@@ -31,6 +40,8 @@ class MockData:
         :param ticker:
         :return:
         """
+        if not date:
+            raise ValueError("invalid date. you must pass in a date first.")
         ticker = ticker.upper()
         if ticker not in MockData.universe:
             raise ValueError(f"{ticker} is not valid. Valid Tickers are {MockData.universe}")

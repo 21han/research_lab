@@ -1,21 +1,20 @@
 """
 app.py
 """
-import boto3
+
 import logging
 import os
 import secrets
 import shutil
-from utils import s3_util, rds
-import flask
 import importlib
 import datetime
 import time
+import json
+import boto3
+import flask
 from tqdm import trange
 import pandas as pd
 from PIL import Image
-import json
-
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
 from flask import request
@@ -25,11 +24,13 @@ from flask_login import LoginManager, UserMixin, current_user, login_required, \
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
-# pylint
 from pylint.lint import Run
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
+from utils import s3_util, rds
+
+
 
 # set the boto3 logging to critical to suppress warning
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
@@ -42,11 +43,13 @@ logger.setLevel(logging.DEBUG)
 app = Flask(__name__)
 app.config.from_object("config")
 
+
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
 
 TOTAL_CAPITAL = 10**6
 
@@ -83,13 +86,19 @@ def about():
 @app.route("/home")
 @login_required
 def home():
+    """
+    home page after user login
+
+    :return: redirect user to upload page
+    """
     if current_user.is_authenticated:
         return redirect('upload')
 
 
 @app.route("/upload")
 @login_required
-# current page is login required, which means not logging will be redirected
+# current page is login required, which means not logging will be
+# redirected
 def upload():
     """home page of the backtesting platform, login is required to access this page
 
@@ -104,26 +113,22 @@ def upload():
 @login_required
 def upload_strategy():
     """upload user strategy to alchemist database
+    These attributes are also available
+    file.filename               # The actual name of the file
+        file.content_type
+        file.content_length
+        file.mimetype
 
     Returns:
         string: return message of upload status with corresponding pylint score
     """
-    
+
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
         return "Strategy name may not be empty"
     file = request.files["user_file"]
     name = request.form["strategy_name"]
-    '''
-        These attributes are also available
-
-        file.filename               # The actual name of the file
-        file.content_type
-        file.content_length
-        file.mimetype
-
-    '''
     if file.filename == "":
         return "Please select a file"
 
@@ -137,8 +142,9 @@ def upload_strategy():
     userid = str(current_user.id)
     # get the number of folders
     bucket_name = app.config["S3_BUCKET"]
-    
-    # path: s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
+
+    # path:
+    # s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
     response = s3_client.list_objects_v2(
         Bucket=bucket_name, Prefix=userid
     )
@@ -146,18 +152,18 @@ def upload_strategy():
     cnt = response["KeyCount"]
     # '''
     # WARNING: there is a maxKey in return which is 1000
-    # if there are more than 1000 in actual, 
+    # if there are more than 1000 in actual,
     # the return might be broken
     # '''
-    
+
     new_folder = "strategy" + str(cnt + 1)
     strategy_folder = os.path.join(userid, new_folder)
-    
+
     # keep a local copy of the file to run pylint
     local_folder = os.path.join('strategies/', userid)
     if not os.path.exists(local_folder):
-       os.makedirs(local_folder)
-    
+        os.makedirs(local_folder)
+
     local_strategy_folder = os.path.join(local_folder, new_folder)
     os.makedirs(local_strategy_folder)
     local_path = os.path.join(local_strategy_folder, file.filename)
@@ -176,9 +182,10 @@ def upload_strategy():
             correct your file and upload again"
 
     # after the check is successful
-    
+
     # upload to s3 bucket
-    filepath = upload_strategy_to_s3(local_path, bucket_name, strategy_folder)
+    filepath = upload_strategy_to_s3(
+        local_path, bucket_name, strategy_folder)
     logger.info(f"file uploads to path {filepath}")
     score = result.linter.stats['global_note']
 
@@ -223,9 +230,12 @@ def login():
         if user and bcrypt.check_password_hash(user.password,
                                                form.password.data):
             login_user(user, remember=form.remember.data)
+            current_user.email = form.email.data
             next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(
-                url_for('home'))
+            if next_page:
+                redirect(next_page)
+            else:
+                redirect(url_for('home'))
         else:
             flash('Login Unsuccessful. Please check email and password',
                   'danger')
@@ -250,7 +260,8 @@ def register():
         flash(f'Your account has been created! You are now able to log in',
               'success')
         return redirect(url_for('login'))
-    return render_template('register.html', title='Register', form=form)
+    return render_template(
+        'register.html', title='Register', form=form)
 
 
 @app.route("/admin", methods=['GET', 'POST'])
@@ -330,7 +341,7 @@ def get_strategy_to_local(strategy_location):
     :return: local strategy file path
     """
 
-    current_usr = 0  # TODO: Michael: please change this
+    current_usr = 0
 
     s3 = s3_util.init_s3()
 
@@ -345,7 +356,8 @@ def get_strategy_to_local(strategy_location):
         open(f"{user_folder}/__init__.py", 'a').close()
 
     local_strategy_path = f"{user_folder}/current_strategy.py"
-    logger.info(f"-- s3 bucket: {s3_url_obj.bucket} -- s3 key: {s3_url_obj.key}")
+    logger.info(
+        f"-- s3 bucket: {s3_url_obj.bucket} -- s3 key: {s3_url_obj.key}")
 
     s3.Bucket(s3_url_obj.bucket).download_file(
         s3_url_obj.key,
@@ -372,16 +384,21 @@ def display_strategy():
     with open(local_strategy_path) as f:
         code_snippet = f.read()
 
-    return render_template('strategy.html', strategy_id=strategy_id, code=code_snippet, num_bars=1)
+    return render_template(
+        'strategy.html', strategy_id=strategy_id, code=code_snippet, num_bars=1)
 
 
 @app.route('/strategy', methods=["POST"])
 @login_required
 def delete_strategy():
+    """
+    delete stratege
+    :return: strageti html
+    """
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
-    
-    delete_strategy(strategy_location)
+
+    delete_strategy_by_user(strategy_location)
     # redirect back to strategies
     return redirect('strategies')
 
@@ -394,15 +411,23 @@ def backtest_progress():
     """
     strategy_id = request.args.get('id')
     logger.info("backtest progress started")
-    current_usr = 0  # TODO Michael please help change this
+    current_usr = 0
 
-    s_module = importlib.import_module(f"strategies.user_id_{current_usr}.current_strategy")
+    s_module = importlib.import_module(
+        f"strategies.user_id_{current_usr}.current_strategy")
 
     n_days_back = 50
-    past_n_days = [datetime.datetime.today() - datetime.timedelta(days=i) for i in range(n_days_back)]
+    past_n_days = [
+        datetime.datetime.today() -
+        datetime.timedelta(
+            days=i) for i in range(n_days_back)]
     past_n_days = sorted(past_n_days)
 
     def backtest():
+        """
+
+        :return:
+        """
         position_df = {
             'value': []
         }
@@ -442,6 +467,13 @@ def backtest_progress():
 
 
 def update_backtest_db(strategy_id, bucket, key):
+    """
+
+    :param strategy_id:
+    :param bucket:
+    :param key:
+    :return:
+    """
     conn = rds.get_connection()
     cursor = conn.cursor()
     timestamp = datetime.datetime.now()
@@ -450,25 +482,37 @@ def update_backtest_db(strategy_id, bucket, key):
             "pnl_location, last_modified_date) \
                     VALUES (%s,%s,%s,%s)"
     cursor.execute(
-        query, (strategy_id, strategy_id, f"s3://{bucket}/{key}", timestamp)
+        query, (strategy_id, strategy_id,
+                f"s3://{bucket}/{key}", timestamp)
     )
     conn.commit()
 
 
 def compute_total_value(day_x, day_x_position):
+    """
+
+    :param day_x:
+    :param day_x_position:
+    :return:
+    """
     total_value = 0
     from utils import mock_historical_data
     for ticker, percent in day_x_position.items():
-        ticker_price = mock_historical_data.MockData.get_price(day_x, ticker)
-        total_value += ticker_price*percent*TOTAL_CAPITAL
+        ticker_price = mock_historical_data.MockData.get_price(
+            day_x, ticker)
+        total_value += ticker_price * percent * TOTAL_CAPITAL
     return total_value
 
 
 @app.route('/backtest_strategy')
 def backtest_strategy():
+    """
+
+    :return:
+    """
     strategy_id = request.args.get('id')
     print(f"Hello {strategy_id}")
-    return ("nothing")
+    return "nothing"
 
 
 @app.route('/results')
@@ -601,19 +645,20 @@ def allowed_file(filename):
                "ALLOWED_EXTENSIONS"]
 
 
-def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
+def upload_strategy_to_s3(
+        file, bucket_name, file_prefix, acl="public-read"):
     """
     Notice that, in addition to ACL we set the ContentType key
-    in ExtraArgs to the file's content type. This is because by 
+    in ExtraArgs to the file's content type. This is because by
     default, all files uploaded to an S3 bucket have their
-    content type set to binary/octet-stream, forcing the 
-    browser to prompt users to download the files instead of 
+    content type set to binary/octet-stream, forcing the
+    browser to prompt users to download the files instead of
     just reading them when accessed via a public URL (which can
     become quite annoying and frustrating for images and pdfs
     for example)
 
     Args:
-        file ([type]): file object
+        file ([str]): local file path
         bucket_name (str): bucket name
         file_prefix (str): file prefix, like linxiao/strategy1
         acl (str, optional): [description]. Defaults to "public-read".
@@ -637,14 +682,15 @@ def upload_strategy_to_s3(file, bucket_name, file_prefix, acl="public-read"):
         )
 
     except Exception as e:
-        # This is a catch all exception, edit this part to fit your needs.
+        # This is a catch all exception, edit this part to fit your
+        # needs.
         print("Something Happened: ", e)
         return e
 
     return "{}{}".format(app.config["S3_LOCATION"], upload_path)
 
 
-def delete_strategy(filepath):
+def delete_strategy_by_user(filepath):
     """delete a strategy
 
     Args:
@@ -658,7 +704,7 @@ def delete_strategy(filepath):
     bucket_name = app.config["S3_BUCKET"]
     split_path = filepath.split('/')
     prefix = "/".join(split_path[3:])
-    
+
     response = s3_client.list_objects_v2(
         Bucket=bucket_name, Prefix=prefix
     )
@@ -675,7 +721,7 @@ def delete_strategy(filepath):
     conn.commit()
     logger.info(f"affected rows = {cursor.rowcount}")
     logger.info("Delete file from Database")
-    
+
 
 # Forms: registration, login, account
 
@@ -699,7 +745,8 @@ class RegistrationForm(FlaskForm):
                                                  EqualTo('password')])
     submit = SubmitField('Sign Up')
 
-    def validate_username(self, username):
+    @staticmethod
+    def validate_username(username):
         """check if username exists in the current user table
 
         Args:
@@ -713,7 +760,8 @@ class RegistrationForm(FlaskForm):
             raise ValidationError(
                 'That username is taken. Please choose a different one.')
 
-    def validate_email(self, email):
+    @staticmethod
+    def validate_email(email):
         """check if input email address exists in the current user table
 
         Args:
@@ -757,14 +805,27 @@ class UpdateAccountForm(FlaskForm):
                         validators=[FileAllowed(['jpg', 'png'])])
     submit = SubmitField('Update')
 
-    def validate_username(self, username):
+    @staticmethod
+    def validate_username(username):
+        """
+        check if updated username is duplicate
+        :param username: new user name
+        :return: None
+        """
         if username.data != current_user.username:
-            user = User.query.filter_by(username=username.data).first()
+            user = User.query.filter_by(
+                username=username.data).first()
             if user:
                 raise ValidationError(
                     'That username is taken. Please choose a different one.')
 
-    def validate_email(self, email):
+    @staticmethod
+    def validate_email(email):
+        """
+        check update email is empty
+        :param email: new email
+        :return: None
+        """
         if email.data != current_user.email:
             user = User.query.filter_by(email=email.data).first()
             if user:
@@ -788,7 +849,10 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(20), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    image_file = db.Column(db.String(20), nullable=False, default='default.jpg')
+    image_file = db.Column(
+        db.String(20),
+        nullable=False,
+        default='default.jpg')
     password = db.Column(db.String(60), nullable=False)
 
     def __repr__(self):
@@ -796,6 +860,14 @@ class User(db.Model, UserMixin):
         :return: stirng contains userid, username, user email of user object
         """
         return f"User('{self.id}', '{self.username}', '{self.email}')"
+
+
+def stop():
+    """
+
+    :return: None
+    """
+    pass
 
 
 def main():
