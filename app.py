@@ -393,7 +393,7 @@ def delete_strategy():
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
 
-    delete_strategy(strategy_location)
+    delete_strategy_by_user(strategy_location)
     # redirect back to strategies
     return redirect('strategies')
 
@@ -606,7 +606,7 @@ def upload_strategy_to_s3(
     return "{}{}".format(app.config["S3_LOCATION"], upload_path)
 
 
-def delete_strategy(filepath):
+def delete_strategy_by_user(filepath):
     """delete a strategy
 
     Args:
