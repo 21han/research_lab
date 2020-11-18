@@ -36,10 +36,6 @@ class TestLoginLogout(TestBase):
 
     def test_login(self):
         """login test users"""
-        response = self.app.get(
-            "/login"
-        )
-        
         response = self.app.post(
             "/login",
             data={

@@ -45,7 +45,6 @@ def test_upload_strategy():
         S3_BUCKET,
         prefix
         )
-    print(location)
     assert location == os.path.join(S3_LOCATION, prefix, 'helpers.py')
 
 
