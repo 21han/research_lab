@@ -2,7 +2,7 @@
 This file contains all the tests for the dash_single.py
 """
 
-from ..dash_plots import dash_single
+import dash_app as dash_single
 import pandas as pd
 import numpy as np
 

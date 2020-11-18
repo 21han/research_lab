@@ -3,7 +3,9 @@ this is the test for helper function in app.py
 """
 
 import app
-from config import S3_LOCATION
+import os
+from utils import s3_util
+from config import S3_LOCATION, S3_BUCKET
 
 def test_get_strategies():
     """
@@ -35,8 +37,27 @@ def test_allow_file():
 
 def test_upload_strategy():
     """
-    need local file , pass for now
+    test uploading strategies
     """
-    pass
+    prefix = os.path.join('-1/', 'strategy7')
+    location = app.upload_strategy_to_s3(
+        "tests/uploads/helpers.py",
+        S3_BUCKET,
+        prefix
+        )
+    assert location == os.path.join(S3_LOCATION, prefix, 'helpers.py')
 
+
+def test_delete_strategy():
+    """
+    test delete strategies
+    """
+    prefix = os.path.join('-1/', 'strategy7')
+    filepath = os.path.join(S3_LOCATION, prefix, 'helpers.py')
+    app.delete_strategy_by_user(filepath)
+    s3_client = s3_util.init_s3_client()
+    response = s3_client.list_objects_v2(
+        Bucket=S3_BUCKET, Prefix=filepath
+    )
+    assert response["KeyCount"] == 0
 
