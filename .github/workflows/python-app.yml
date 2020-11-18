@@ -26,9 +26,14 @@ jobs:
         $CONDA/bin/flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         $CONDA/bin/flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Conda Info
-      run: |
-        conda info
     - name: Test with pytest
       run: |
+        export USER_SERVICE_SECRET_KEY=${{ secrets.USER_SERVICE_SECRET_KEY }}
+        export USER_SERVICE_HOST=${{ secrets.USER_SERVICE_HOST }}
+        export USER_SERVICE_USER=${{ secrets.USER_SERVICE_USER }}
+        export USER_SERVICE_PASSWORD=${{ secrets.USER_SERVICE_PASSWORD }}
+        export USER_SERVICE_PORT=${{ secrets.USER_SERVICE_PORT }}
+        export S3_ACCESS_KEY=${{ secrets.S3_ACCESS_KEY }}
+        export S3_SECRET_KEY=${{ secrets.S3_SECRET_KEY }}
+        export ALCHEMIST_RDB_HOST=${{ secrets.ALCHEMIST_RDB_HOST }}
         $CONDA/bin/pytest
