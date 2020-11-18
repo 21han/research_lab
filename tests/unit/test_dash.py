@@ -2,7 +2,11 @@
 This file contains all the tests for the dash_single.py
 """
 
+<<<<<<< HEAD:tests/test_dash.py
 import dash_app
+=======
+import dash_app as dash_single
+>>>>>>> master:tests/unit/test_dash.py
 import pandas as pd
 import numpy as np
 
