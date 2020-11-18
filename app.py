@@ -511,7 +511,65 @@ def backtest_strategy():
     print(f"Hello {strategy_id}")
     return "nothing"
 
+
+@app.route('/results')
+# @login_required
+def display_results():
+    """display all the backtest results with selection option
+        Returns:
+            function: results.html
+    """
+    #current_user_id = current_user.id
+    current_user_id = 0
+    user_backests = get_user_backtests(current_user_id)
+    # display all user backtest results as a table on the U.I.
+    return render_template("results.html", df=user_backests)
+
+
+@app.route('/plots',  methods=['POST'])
+# @login_required
+def run_dash():
+    """run dash app here.
+        redirect to dash url
+    """
+    strategy_ids = request.get_data('ids')
+    #print(strategy_ids)
+    while True:
+        newpid = os.fork()
+        if newpid == 0:
+            child(strategy_ids)
+        else:
+            pids = (os.getpid(), newpid)
+            print("parent: %d, child: %d\n" % pids)
+
+            return redirect("http://127.0.0.1:8050/")
+        reply = input("q for quit / c for new fork")
+        if reply == 'c':
+            continue
+        else:
+            break
+
+    # return render_template("welcome.html")
+    # return redirect("http://127.0.0.1:8050/")
+    # child process
+    # run dash
+    # redirect to dash
+
 # helper functions
+def child(strategy_ids):
+    print('\nA new child ', os.getpid())
+    os.system('./start_dash.sh')
+    os._exit(0)
+
+def get_user_backtests(user_id):
+    """
+    Get backtest dataframe from rds.
+    :param user_id: user id
+    :return: dataframe
+    """
+    backtests = rds.get_all_backtests(user_id)
+
+    return backtests
 
 
 def save_picture(form_picture):
