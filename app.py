@@ -230,12 +230,14 @@ def login():
             current_user.email = form.email.data
             next_page = request.args.get('next')
             if next_page:
-                redirect(next_page)
+                return redirect(next_page)
             else:
-                redirect(url_for('home'))
+                return redirect(url_for('home'))
         else:
             flash('Login Unsuccessful. Please check email and password',
                   'danger')
+    
+    logger.info("NOT AUTHENTICATED")
     return render_template('login.html', title='Login', form=form)
 
 
