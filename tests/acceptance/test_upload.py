@@ -13,12 +13,12 @@ class TestUpload(TestBase):
         """
         Common cases 1.1: valid upload:
         '
-        Investment professionals should be able to upload valid strategies and corresponding data with the strategy successfully.   
+        Investment professionals should be able to upload valid strategies and corresponding data with the strategy successfully.
         
         AND
         
         Common cases 4: delete
-        Investment professionals should be able to delete any strategies/data/results they don’t want anymore. 
+        Investment professionals should be able to delete any strategies/data/results they don’t want anymore.
         '
         """
         response = self.app.post(
