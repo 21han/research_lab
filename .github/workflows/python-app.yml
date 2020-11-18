@@ -29,15 +29,15 @@ jobs:
     - name: Init Conda
       run: |
         $CONDA/bin/conda init bash
+    - name: Refresh Bash
+      run: |
+        exec bash
     - name: Activate Environment (and debugging)
       run: |
+        conda activate ResearchLab
         which conda
         which python
-        ls $CONDA/envs/
-        ls $CONDA/envs/ResearchLab/
-        $CONDA/bin/conda activate ResearchLab
-        which conda
-        which python
+        which pytest
     - name: Conda Info
       run: |
         conda info
