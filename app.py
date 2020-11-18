@@ -24,6 +24,7 @@ from flask_login import LoginManager, UserMixin, current_user, login_required, \
     login_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
+from flask_wtf import CSRFProtect
 from flask_wtf.file import FileAllowed, FileField
 # pylint
 from pylint.lint import Run
@@ -39,14 +40,20 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
+csrf = CSRFProtect()
 app = Flask(__name__)
 app.config.from_object("config")
+
+# to avoid testing "Fix Missing CSRF Token Issues with Flask" issue
+csrf.init_app(app)
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
+
 
 TOTAL_CAPITAL = 10**6
 

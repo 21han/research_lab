@@ -19,6 +19,12 @@ class TestRoot(TestBase):
             200,
             "not able to get to root directory"
         )
+        
+        self.assertIn(
+            b'Login',
+            response.data,
+            "not able to find a place to log in"
+        )
 
     def test_welcome_directory(self):
         """
