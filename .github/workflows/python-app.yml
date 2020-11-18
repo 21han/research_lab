@@ -28,8 +28,13 @@ jobs:
         $CONDA/bin/flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Activate Environment
       run: |
-        CONDA/bin/conda activate ResearchLab
+        ls $CONDA
+        pwd
+        which conda
+        which python
+        $CONDA/bin/conda activate ResearchLab
+        which conda
+        which python
     - name: Test with pytest
       run: |
-        CONDA/bin/conda install pytest
-        $CONDA/bin/pytest
+        pytest
