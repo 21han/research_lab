@@ -21,13 +21,11 @@ app.layout = html.Div()
     [State('my_pnl_symbol', 'value')])
 def update_graph(title):
     """
-    @Erica, please add docstring
+    to update graph
     :param title:
     :return:
     """
     graph_data = []
-
-    # TODO: need to modify this.
     path = title + '.csv'
     graph_data_df = pd.read_csv(path)
     graph_data.append({'x': graph_data_df['date'], 'y': graph_data_df['pnl']})
@@ -52,7 +50,6 @@ if __name__ == '__main__':
 
     # Create a sidebar with stock to select
 
-    # TODO: need to modify this.
     str_name_dic = {'STRG1': 'Strategy1', 'STRG2': 'Strategy2', 'STRG3': 'Strategy3'}
     options = []
     for ticker in str_name_dic:
