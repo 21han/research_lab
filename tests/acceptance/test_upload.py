@@ -129,35 +129,3 @@ class TestUpload(TestBase):
                          "User cannot upload a valid file")
         self.assertIn(b"select a file", response.data,
                       "cannot check empty file")
-        
-    # def test_delete_file(self):
-    #     """
-    #     there is no invalid request at this point
-    #     '
-    #     Investment professionals should be able to delete any strategies/data/results they don’t want anymore. 
-        
-    #     NOTE: order matters
-    #     '
-    #     """
-    #     # 11 is testuser
-    #     s3_path = "s3://coms4156-strategies/11/strategy2/helpers.py"
-    #     response = self.app.post(
-    #         "/login",
-    #         data={
-    #             "email": "testuser@testuser.com",
-    #             "password": "testuser"},
-    #     )
-        
-    #     conn = rds.get_connection()
-    #     strategies = pd.read_sql(
-    #         f"select * from backtest.strategies where strategy_location = '{s3_path}';",
-    #         conn
-    #     )
-    #     s_id = strategies['strategy_id'].iloc[0]
-    #     response = self.app.post(
-    #         "/strategy?id="+str(s_id),
-    #     )
-        
-    #     # redirect
-    #     self.assertEqual(response.status_code, 302,
-    #                      "User cannot delete file")
