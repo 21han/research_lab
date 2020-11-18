@@ -10,7 +10,6 @@ import importlib
 import datetime
 import time
 import json
-import boto3
 import flask
 from tqdm import trange
 import pandas as pd
@@ -93,6 +92,7 @@ def home():
     """
     if current_user.is_authenticated:
         return redirect('upload')
+    return render_template('welcome.html', title='About')
 
 
 @app.route("/upload")
@@ -143,8 +143,7 @@ def upload_strategy():
     # get the number of folders
     bucket_name = app.config["S3_BUCKET"]
 
-    # path:
-    # s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
+    # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
     response = s3_client.list_objects_v2(
         Bucket=bucket_name, Prefix=userid
     )
@@ -180,8 +179,6 @@ def upload_strategy():
         shutil.rmtree(local_strategy_folder)
         return "Your strategy has error or is not able to run! \
             correct your file and upload again"
-
-    # after the check is successful
 
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(
@@ -336,14 +333,14 @@ def all_strategy():
 
 def get_strategy_to_local(strategy_location):
     """
-    get strategy from s3 to local
-    :param strategy_location: s3 loction
+    get strategy from s3_resource to local
+    :param strategy_location: s3_resource loction
     :return: local strategy file path
     """
 
     current_usr = 0
 
-    s3 = s3_util.init_s3()
+    s3_resource = s3_util.init_s3()
 
     if "/" not in strategy_location:
         raise ValueError("Invalid Strategy Location.")
@@ -357,9 +354,9 @@ def get_strategy_to_local(strategy_location):
 
     local_strategy_path = f"{user_folder}/current_strategy.py"
     logger.info(
-        f"-- s3 bucket: {s3_url_obj.bucket} -- s3 key: {s3_url_obj.key}")
+        f"-- s3_resource bucket: {s3_url_obj.bucket} -- s3_resource key: {s3_url_obj.key}")
 
-    s3.Bucket(s3_url_obj.bucket).download_file(
+    s3_resource.Bucket(s3_url_obj.bucket).download_file(
         s3_url_obj.key,
         local_strategy_path
     )
@@ -381,8 +378,8 @@ def display_strategy():
     local_strategy_path = get_strategy_to_local(strategy_location)
 
     # step 2: display content
-    with open(local_strategy_path) as f:
-        code_snippet = f.read()
+    with open(local_strategy_path) as file:
+        code_snippet = file.read()
 
     return render_template(
         'strategy.html', strategy_id=strategy_id, code=code_snippet, num_bars=1)
@@ -431,17 +428,17 @@ def backtest_progress():
         position_df = {
             'value': []
         }
-        for d in trange(n_days_back):
+        for day_x in trange(n_days_back):
             one_tenth = n_days_back // 10
-            if d % one_tenth == 0:
+            if day_x % one_tenth == 0:
                 time.sleep(1)
             progress = {
-                0: min(100 * d // n_days_back, 100)
+                0: min(100 * day_x // n_days_back, 100)
             }
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
             day_x_position = s_module.Strategy().run()
-            day_x = past_n_days[d]
+            day_x = past_n_days[day_x]
             total_value_x = compute_total_value(day_x, day_x_position)
             position_df['value'].append(total_value_x)
 
@@ -646,7 +643,7 @@ def allowed_file(filename):
 
 
 def upload_strategy_to_s3(
-        file, bucket_name, file_prefix, acl="public-read"):
+        file, bucket_name, file_prefix):
     """
     Notice that, in addition to ACL we set the ContentType key
     in ExtraArgs to the file's content type. This is because by
@@ -661,7 +658,6 @@ def upload_strategy_to_s3(
         file ([str]): local file path
         bucket_name (str): bucket name
         file_prefix (str): file prefix, like linxiao/strategy1
-        acl (str, optional): [description]. Defaults to "public-read".
 
     Returns:
         [str]: upload file path
@@ -860,14 +856,6 @@ class User(db.Model, UserMixin):
         :return: stirng contains userid, username, user email of user object
         """
         return f"User('{self.id}', '{self.username}', '{self.email}')"
-
-
-def stop():
-    """
-
-    :return: None
-    """
-    pass
 
 
 def main():
