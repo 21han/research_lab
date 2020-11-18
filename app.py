@@ -228,6 +228,7 @@ def login():
         if user and bcrypt.check_password_hash(user.password,
                                                form.password.data):
             login_user(user, remember=form.remember.data)
+            current_user.email = form.email.data
             next_page = request.args.get('next')
             return redirect(next_page) if next_page else redirect(
                 url_for('home'))
@@ -336,7 +337,7 @@ def get_strategy_to_local(strategy_location):
     :return: local strategy file path
     """
 
-    current_usr = 0  # TODO: Michael: please change this
+    current_usr = 0
 
     s3 = s3_util.init_s3()
 
