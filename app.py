@@ -1,21 +1,20 @@
 """
 app.py
 """
-import boto3
+
 import logging
 import os
 import secrets
 import shutil
-from utils import s3_util, rds
-import flask
 import importlib
 import datetime
 import time
+import json
+import boto3
+import flask
 from tqdm import trange
 import pandas as pd
 from PIL import Image
-import json
-
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
 from flask import request
@@ -25,11 +24,13 @@ from flask_login import LoginManager, UserMixin, current_user, login_required, \
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
-# pylint
 from pylint.lint import Run
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
+from utils import s3_util, rds
+
+
 
 # set the boto3 logging to critical to suppress warning
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
@@ -85,6 +86,11 @@ def about():
 @app.route("/home")
 @login_required
 def home():
+    """
+    home page after user login
+
+    :return: redirect user to upload page
+    """
     if current_user.is_authenticated:
         return redirect('upload')
 
@@ -107,6 +113,11 @@ def upload():
 @login_required
 def upload_strategy():
     """upload user strategy to alchemist database
+    These attributes are also available
+    file.filename               # The actual name of the file
+        file.content_type
+        file.content_length
+        file.mimetype
 
     Returns:
         string: return message of upload status with corresponding pylint score
@@ -118,15 +129,6 @@ def upload_strategy():
         return "Strategy name may not be empty"
     file = request.files["user_file"]
     name = request.form["strategy_name"]
-    '''
-        These attributes are also available
-
-        file.filename               # The actual name of the file
-        file.content_type
-        file.content_length
-        file.mimetype
-
-    '''
     if file.filename == "":
         return "Please select a file"
 
@@ -228,9 +230,12 @@ def login():
         if user and bcrypt.check_password_hash(user.password,
                                                form.password.data):
             login_user(user, remember=form.remember.data)
+            current_user.email = form.email.data
             next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(
-                url_for('home'))
+            if next_page:
+                redirect(next_page)
+            else:
+                redirect(url_for('home'))
         else:
             flash('Login Unsuccessful. Please check email and password',
                   'danger')
@@ -336,7 +341,7 @@ def get_strategy_to_local(strategy_location):
     :return: local strategy file path
     """
 
-    current_usr = 0  # TODO: Michael: please change this
+    current_usr = 0
 
     s3 = s3_util.init_s3()
 
@@ -386,6 +391,10 @@ def display_strategy():
 @app.route('/strategy', methods=["POST"])
 @login_required
 def delete_strategy():
+    """
+    delete stratege
+    :return: strageti html
+    """
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
 
@@ -402,7 +411,7 @@ def backtest_progress():
     """
     strategy_id = request.args.get('id')
     logger.info("backtest progress started")
-    current_usr = 0  # TODO Michael please help change this
+    current_usr = 0
 
     s_module = importlib.import_module(
         f"strategies.user_id_{current_usr}.current_strategy")
@@ -415,6 +424,10 @@ def backtest_progress():
     past_n_days = sorted(past_n_days)
 
     def backtest():
+        """
+
+        :return:
+        """
         position_df = {
             'value': []
         }
@@ -454,6 +467,13 @@ def backtest_progress():
 
 
 def update_backtest_db(strategy_id, bucket, key):
+    """
+
+    :param strategy_id:
+    :param bucket:
+    :param key:
+    :return:
+    """
     conn = rds.get_connection()
     cursor = conn.cursor()
     timestamp = datetime.datetime.now()
@@ -469,6 +489,12 @@ def update_backtest_db(strategy_id, bucket, key):
 
 
 def compute_total_value(day_x, day_x_position):
+    """
+
+    :param day_x:
+    :param day_x_position:
+    :return:
+    """
     total_value = 0
     from utils import mock_historical_data
     for ticker, percent in day_x_position.items():
@@ -480,11 +506,73 @@ def compute_total_value(day_x, day_x_position):
 
 @app.route('/backtest_strategy')
 def backtest_strategy():
+    """
+
+    :return:
+    """
     strategy_id = request.args.get('id')
     print(f"Hello {strategy_id}")
-    return ("nothing")
+    return "nothing"
+
+
+@app.route('/results')
+# @login_required
+def display_results():
+    """display all the backtest results with selection option
+        Returns:
+            function: results.html
+    """
+    #current_user_id = current_user.id
+    current_user_id = 0
+    user_backests = get_user_backtests(current_user_id)
+    # display all user backtest results as a table on the U.I.
+    return render_template("results.html", df=user_backests)
+
+
+@app.route('/plots',  methods=['POST'])
+# @login_required
+def run_dash():
+    """run dash app here.
+        redirect to dash url
+    """
+    strategy_ids = request.get_data('ids')
+    #print(strategy_ids)
+    while True:
+        newpid = os.fork()
+        if newpid == 0:
+            child(strategy_ids)
+        else:
+            pids = (os.getpid(), newpid)
+            print("parent: %d, child: %d\n" % pids)
+
+            return redirect("http://127.0.0.1:8050/")
+        reply = input("q for quit / c for new fork")
+        if reply == 'c':
+            continue
+        else:
+            break
+
+    # return render_template("welcome.html")
+    # return redirect("http://127.0.0.1:8050/")
+    # child process
+    # run dash
+    # redirect to dash
 
 # helper functions
+def child(strategy_ids):
+    print('\nA new child ', os.getpid())
+    os.system('./start_dash.sh')
+    os._exit(0)
+
+def get_user_backtests(user_id):
+    """
+    Get backtest dataframe from rds.
+    :param user_id: user id
+    :return: dataframe
+    """
+    backtests = rds.get_all_backtests(user_id)
+
+    return backtests
 
 
 def save_picture(form_picture):
@@ -657,7 +745,8 @@ class RegistrationForm(FlaskForm):
                                                  EqualTo('password')])
     submit = SubmitField('Sign Up')
 
-    def validate_username(self, username):
+    @staticmethod
+    def validate_username(username):
         """check if username exists in the current user table
 
         Args:
@@ -671,7 +760,8 @@ class RegistrationForm(FlaskForm):
             raise ValidationError(
                 'That username is taken. Please choose a different one.')
 
-    def validate_email(self, email):
+    @staticmethod
+    def validate_email(email):
         """check if input email address exists in the current user table
 
         Args:
@@ -715,7 +805,13 @@ class UpdateAccountForm(FlaskForm):
                         validators=[FileAllowed(['jpg', 'png'])])
     submit = SubmitField('Update')
 
-    def validate_username(self, username):
+    @staticmethod
+    def validate_username(username):
+        """
+        check if updated username is duplicate
+        :param username: new user name
+        :return: None
+        """
         if username.data != current_user.username:
             user = User.query.filter_by(
                 username=username.data).first()
@@ -723,7 +819,13 @@ class UpdateAccountForm(FlaskForm):
                 raise ValidationError(
                     'That username is taken. Please choose a different one.')
 
-    def validate_email(self, email):
+    @staticmethod
+    def validate_email(email):
+        """
+        check update email is empty
+        :param email: new email
+        :return: None
+        """
         if email.data != current_user.email:
             user = User.query.filter_by(email=email.data).first()
             if user:
@@ -761,6 +863,10 @@ class User(db.Model, UserMixin):
 
 
 def stop():
+    """
+
+    :return: None
+    """
     pass
 
 

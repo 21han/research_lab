@@ -1,9 +1,8 @@
-![Pytest](https://github.com/gzhami/research_lab/workflows/Pytest/badge.svg)
 ![Pylint](https://github.com/gzhami/research_lab/workflows/Pylint/badge.svg)
 
 # research_lab
 
-To help IP and investors visualize and backtest strategies.
+To help algo traders visualize and backtest strategies.
 
 # Environment
 
