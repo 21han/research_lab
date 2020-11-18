@@ -39,5 +39,4 @@ def test_upload_strategy():
     """
     pass
 
-def 
 
