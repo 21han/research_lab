@@ -1,5 +1,4 @@
 import os
-import pymysql
 
 S3_BUCKET                       = "coms4156-strategies"
 DB_HOST                         = os.environ.get('ALCHEMIST_RDB_HOST')
