@@ -2,16 +2,16 @@
 app.py
 """
 
+import datetime
+import importlib
+import json
 import logging
 import os
 import secrets
 import shutil
-import importlib
-import datetime
 import time
-import json
+
 import flask
-from tqdm import trange
 import pandas as pd
 from PIL import Image
 from flask import Flask, flash, redirect, url_for
@@ -24,11 +24,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from pylint.lint import Run
+from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-from utils import s3_util, rds
 
+from utils import mock_historical_data
+from utils import s3_util, rds
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -476,13 +478,13 @@ def update_backtest_db(strategy_id, bucket, key):
 
 def compute_total_value(day_x, day_x_position):
     """
-
+    compute total values on a given day
     :param day_x:
     :param day_x_position:
     :return:
     """
     total_value = 0
-    from utils import mock_historical_data
+
     for ticker, percent in day_x_position.items():
         ticker_price = mock_historical_data.MockData.get_price(
             day_x, ticker)
