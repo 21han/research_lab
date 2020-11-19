@@ -54,3 +54,23 @@ class TestLoginLogout(TestBase):
             path, "/home",
             "Redirect location is not /home"
         )
+
+    def test_logout(self):
+        """logout test user"""
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
+        )
+
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the test user")
+
+        logout_response = self.app.get('/logout', content_type='html/text')
+
+        self.assertEqual(
+                logout_response.status_code,
+                302,
+                "not able to logout"
+        )

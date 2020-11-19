@@ -2,16 +2,16 @@
 app.py
 """
 
+import datetime
+import importlib
+import json
 import logging
 import os
 import secrets
 import shutil
-import importlib
-import datetime
 import time
-import json
+
 import flask
-from tqdm import trange
 import pandas as pd
 from PIL import Image
 from flask import Flask, flash, redirect, url_for
@@ -24,6 +24,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from pylint.lint import Run
+from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
@@ -32,9 +33,10 @@ import threading
 import subprocess
 import webbrowser
 import dash_app
+from utils import mock_historical_data
 
 
-# set the boto3 logging to critical to suppress warning
+
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 
@@ -45,18 +47,17 @@ logger.setLevel(logging.DEBUG)
 app = Flask(__name__)
 app.config.from_object("config")
 
-
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
-
-TOTAL_CAPITAL = 10**6
+TOTAL_CAPITAL = 10 ** 6
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
+
 
 #subprocess
 pro = None
@@ -96,14 +97,19 @@ def home():
     :return: redirect user to upload page
     """
     if current_user.is_authenticated:
+        conn = rds.get_connection()
+        userid = pd.read_sql(
+            f"select id from backtest.user where email = '{current_user.email}';",
+            conn
+        )
+        current_user.id = int(userid['id'].iloc[0])
+
         return redirect('upload')
     return render_template('welcome.html', title='About')
 
 
 @app.route("/upload")
 @login_required
-# current page is login required, which means not logging will be
-# redirected
 def upload():
     """home page of the backtesting platform, login is required to access this page
 
@@ -154,12 +160,6 @@ def upload_strategy():
     )
 
     cnt = response["KeyCount"]
-    # '''
-    # WARNING: there is a maxKey in return which is 1000
-    # if there are more than 1000 in actual,
-    # the return might be broken
-    # '''
-
     new_folder = "strategy" + str(cnt + 1)
     strategy_folder = os.path.join(userid, new_folder)
 
@@ -241,7 +241,6 @@ def login():
         else:
             flash('Login Unsuccessful. Please check email and password',
                   'danger')
-    
     logger.info("NOT AUTHENTICATED")
     return render_template('login.html', title='Login', form=form)
 
@@ -269,7 +268,6 @@ def register():
 
 
 @app.route("/admin", methods=['GET', 'POST'])
-# @login_required
 def admin():
     """render admin user page
 
@@ -330,7 +328,6 @@ def all_strategy():
     current_user_id = current_user.id
     username = current_user.username
     all_user_strategies = get_user_strategies(current_user_id)
-    # display all user strategy as a table on the U.I.
     return render_template(
         'strategies.html',
         df=all_user_strategies,
@@ -345,7 +342,12 @@ def get_strategy_to_local(strategy_location):
     :return: local strategy file path
     """
 
-    current_usr = 0
+    conn = rds.get_connection()
+    userid = pd.read_sql(
+        f"select id from backtest.user where email = '{current_user.email}';",
+        conn
+    )
+    current_usr = userid
 
     s3_resource = s3_util.init_s3()
 
@@ -403,7 +405,6 @@ def delete_strategy():
     strategy_location = get_strategy_location(strategy_id)
 
     delete_strategy_by_user(strategy_location)
-    # redirect back to strategies
     return redirect('strategies')
 
 
@@ -415,7 +416,7 @@ def backtest_progress():
     """
     strategy_id = request.args.get('id')
     logger.info("backtest progress started")
-    current_usr = 0
+    current_usr = current_user.id
 
     s_module = importlib.import_module(
         f"strategies.user_id_{current_usr}.current_strategy")
@@ -449,7 +450,7 @@ def backtest_progress():
             total_value_x = compute_total_value(day_x, day_x_position)
             position_df['value'].append(total_value_x)
 
-        yield f"data:{json.dumps({0:100})}\n\n"
+        yield f"data:{json.dumps({0: 100})}\n\n"
 
         position_df = pd.DataFrame(position_df)
         pnl_df = position_df.diff(-1)
@@ -494,13 +495,13 @@ def update_backtest_db(strategy_id, bucket, key):
 
 def compute_total_value(day_x, day_x_position):
     """
-
+    compute total values on a given day
     :param day_x:
     :param day_x_position:
     :return:
     """
     total_value = 0
-    from utils import mock_historical_data
+
     for ticker, percent in day_x_position.items():
         ticker_price = mock_historical_data.MockData.get_price(
             day_x, ticker)
@@ -514,28 +515,29 @@ def backtest_strategy():
     :return:
     """
     strategy_id = request.args.get('id')
-    print(f"Hello {strategy_id}")
     return "nothing"
 
 
 @app.route('/results')
-@login_required
+# @login_required
 def display_results():
     """display all the backtest results with selection option
         Returns:
             function: results.html
     """
-    current_user_id = current_user.id
-    #current_user_id = 0
+    # current_user_id = current_user.id
+    current_user_id = 0
     user_backests = get_user_backtests(current_user_id)
 
+    #current_user_id = current_user.id
     # display all user backtest results as a table on the U.I.
+    current_user_id = 0
+    user_backests = get_user_backtests(current_user_id)
     return render_template("results.html", df=user_backests)
 
 
-
 @app.route('/plots',  methods=['POST'])
-@login_required
+# @login_required
 def run_dash():
     """
     Run dash app first in this function
@@ -644,7 +646,7 @@ def get_strategy_location(strategy_id):
         conn
     )
     s_loc = strategies['strategy_location'].iloc[0]
-    logger.info(f"[db] - {s_loc}")
+    logger.info("[db] - %s}", s_loc)
     return s_loc
 
 
@@ -657,9 +659,6 @@ def allowed_file(filename):
     Returns:
         [bool]: yes for allowed, no for not allowed
     """
-
-    # allowed file extenstion
-    # see config.py
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config[
                "ALLOWED_EXTENSIONS"]
@@ -688,22 +687,16 @@ def upload_strategy_to_s3(
     filename = file.split('/')[-1]
     upload_path = os.path.join(file_prefix, filename)
     try:
-        logger.info(f"uploading file: to path {upload_path}")
+        logger.info("uploading file: to path %s", upload_path)
 
         s3_client.upload_file(
             file,
             bucket_name,
             upload_path,
-            # ExtraArgs={
-            #     "ACL": acl,
-            #     "ContentType": file.content_type
-            # }
         )
 
-    except Exception as e:
-        # This is a catch all exception, edit this part to fit your
-        # needs.
-        print("Something Happened: ", e)
+    except Exception as exp_msg:
+        logger("Something Happened: %s", exp_msg)
         return e
 
     return "{}{}".format(app.config["S3_LOCATION"], upload_path)
@@ -728,22 +721,21 @@ def delete_strategy_by_user(filepath):
         Bucket=bucket_name, Prefix=prefix
     )
     object_cnt = response["KeyCount"]
-    object = response['Contents'][0]  # assume only one match
-    logger.info(f"affected objects = {object_cnt}")
+    s3_object = response['Contents'][0]  # assume only one match
+    logger.info("affected objects = %d", object_cnt)
     logger.info("Delete file from AWS")
-    s3_client.delete_object(Bucket=bucket_name, Key=object['Key'])
+    s3_client.delete_object(Bucket=bucket_name, Key=s3_object['Key'])
     logger.info("Delete file from AWS")
     cursor = conn.cursor()
     query = "DELETE FROM backtest.strategies \
                 WHERE strategy_location = %s"
     cursor.execute(query, (filepath,))
     conn.commit()
-    logger.info(f"affected rows = {cursor.rowcount}")
+    logger.info("affected rows = %d", cursor.rowcount)
     logger.info("Delete file from Database")
 
 
 # Forms: registration, login, account
-
 
 class RegistrationForm(FlaskForm):
     """Form contains registered user information
@@ -755,17 +747,14 @@ class RegistrationForm(FlaskForm):
         ValidationError: user name exists in the current user table
         ValidationError: email address exists in the current user table
     """
-    username = StringField('Username',
-                           validators=[DataRequired(), Length(min=2, max=20)])
+    username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
-    confirm_password = PasswordField('Confirm Password',
-                                     validators=[DataRequired(),
-                                                 EqualTo('password')])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(),
+                                                                     EqualTo('password')])
     submit = SubmitField('Sign Up')
 
-    @staticmethod
-    def validate_username(username):
+    def validate_username(self, username):
         """check if username exists in the current user table
 
         Args:
@@ -776,11 +765,9 @@ class RegistrationForm(FlaskForm):
         """
         user = User.query.filter_by(username=username.data).first()
         if user:
-            raise ValidationError(
-                'That username is taken. Please choose a different one.')
+            raise ValidationError('That username is taken. Please choose a different one.')
 
-    @staticmethod
-    def validate_email(email):
+    def validate_email(self, email):
         """check if input email address exists in the current user table
 
         Args:
@@ -791,8 +778,7 @@ class RegistrationForm(FlaskForm):
         """
         user = User.query.filter_by(email=email.data).first()
         if user:
-            raise ValidationError(
-                'That email is taken. Please choose a different one.')
+            raise ValidationError('That email is taken. Please choose a different one.')
 
 
 class LoginForm(FlaskForm):
@@ -824,8 +810,7 @@ class UpdateAccountForm(FlaskForm):
                         validators=[FileAllowed(['jpg', 'png'])])
     submit = SubmitField('Update')
 
-    @staticmethod
-    def validate_username(username):
+    def validate_username(self, username):
         """
         check if updated username is duplicate
         :param username: new user name
@@ -838,8 +823,7 @@ class UpdateAccountForm(FlaskForm):
                 raise ValidationError(
                     'That username is taken. Please choose a different one.')
 
-    @staticmethod
-    def validate_email(email):
+    def validate_email(self, email):
         """
         check update email is empty
         :param email: new email

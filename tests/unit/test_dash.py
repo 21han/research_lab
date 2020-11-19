@@ -2,11 +2,7 @@
 This file contains all the tests for the dash_single.py
 """
 
-<<<<<<< HEAD:tests/test_dash.py
 import dash_app
-=======
-import dash_app as dash_single
->>>>>>> master:tests/unit/test_dash.py
 import pandas as pd
 import numpy as np
 
@@ -46,9 +42,10 @@ def test_annual_volatility():
     data = pd.DataFrame({'date': ['2020-10-04 12:09:07', '2020-10-05 16:10:05',
                                   '2020-10-06 12:01:00', '2020-10-07 17:00:00'],
                          'pnl': [1000, 900, 750, -1500]})
-    std = np.std([1000, 900, 750, -1500], ddof=1)
+
+    std = np.std([1000/10**6, 900/10**6, 750/10**6, -1500/10**6], ddof=1)
     result = dash_app.pnl_summary(data)
-    volatility = str(round(std*np.sqrt(252), 2)) + '%'
+    volatility = str(round(std*np.sqrt(365), 2)) + '%'
     assert volatility == result['Value'].iloc[2]
 
 
@@ -65,7 +62,7 @@ def test_sharpe_ratio():
     std = np.std(cum_shift, ddof=1)
     mean = cum_shift.mean()
     result = dash_app.pnl_summary(data)
-    sr = str(round(mean / std * np.sqrt(252), 2) )
+    sr = str(round(mean / std * np.sqrt(365), 2) )
     assert sr == result['Value'].iloc[3]
 
 

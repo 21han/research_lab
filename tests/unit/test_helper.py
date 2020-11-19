@@ -61,3 +61,15 @@ def test_delete_strategy():
     )
     assert response["KeyCount"] == 0
 
+
+def test_compute_total_value():
+    """
+    test compute total value
+    :return:
+    """
+    # case 1: date is None, position is empty
+    assert app.compute_total_value(None, {}) == 0
+
+    # case 2: date is not None, position is non-empty
+    assert app.compute_total_value('2020-11-11', {'BTC': 0.2, 'ETH': 0.8}) > 0
+

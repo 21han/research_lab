@@ -1,23 +1,23 @@
-import os, sys
-import numpy as np
-from dash import Dash
-import plotly.express as px
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-import pandas as pd
 import dash_table as dt
+import numpy as np
+import pandas as pd
+import plotly.express as px
+
+from dash import Dash
 from utils import s3_util, rds
-import flask
 
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 bucket_name = "coms4156-strategies"
 
-# app = flask.Flask(__name__)
 dash_app = Dash(__name__)
 dash_app.layout = html.Div()
+
+TOTAL_CAPITAL = 10**6
 
 
 def fig_update(file_path):
@@ -197,7 +197,7 @@ def get_plot(strategy_ids):
     :return:
     """
 
-    backtests = rds.get_all_loations(strategy_ids)
+    backtests = rds.get_all_locations(strategy_ids)
     strategy_names = {}
     pnl_paths = {}
     for idx, id in enumerate(strategy_ids):
@@ -230,7 +230,9 @@ def pnl_summary(data):
     result['Value'].append(str(cumulative_return) + '%')
 
     # Annual volatility  -->  every value / 10**6
-    annual_volatility = round(data['pnl'].std() * np.sqrt(365), 2)
+    daily_change = data['pnl'] / 10**6
+    daily_change.pct_change()
+    annual_volatility = round(daily_change.std() * np.sqrt(365), 2)
     result['Category'].append('Annual Volatility')
     result['Value'].append(str(annual_volatility) + '%')
 
@@ -256,8 +258,8 @@ def pnl_summary(data):
     result['Value'].append(str(kurtosis))
 
     # Daily Turnover (optional)
-
     return pd.DataFrame(result)
+
 
 
 def call_dash(*args):
@@ -266,13 +268,21 @@ def call_dash(*args):
     :param args: args should be ids, like 15, 20, 24
     :return:
     """
-    ids = [str(item) for item in args[0]]
+    ids = [str(item) for item in args[0][1:]]
     get_plot(ids)
 
-    #app1.run(host='127.0.0.1', port=8050, debug=False, threaded=True)
     dash_app.run_server(host='127.0.0.1', port=8050, debug=False, threaded=True)
 
+def main(*args):
+    """
+
+    :param args:
+    :return:
+    """
+    ids = args[0][1:]
+    get_plot(ids)
+    app.run_server(debug=False)
 
 if __name__ == "__main__":
-#    print(sys.argv)
     call_dash(sys.argv)
+

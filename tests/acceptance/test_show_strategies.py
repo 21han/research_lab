@@ -2,10 +2,6 @@
 /login
 """
 from .test_baseclass import TestBase
-from urllib.parse import urlparse
-from utils import rds
-import pandas as pd
-import io
 
 
 class TestStrategies(TestBase):
