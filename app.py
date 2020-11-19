@@ -28,9 +28,13 @@ from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-
 from utils import s3_util, rds
+import threading
+import subprocess
+import webbrowser
+import dash_app
 from utils import mock_historical_data
+
 
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
@@ -55,8 +59,10 @@ TOTAL_CAPITAL = 10 ** 6
 s3_client = s3_util.init_s3_client()
 
 
-# endpoint routes
+#subprocess
+pro = None
 
+# endpoint routes
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -506,7 +512,6 @@ def compute_total_value(day_x, day_x_position):
 @app.route('/backtest_strategy')
 def backtest_strategy():
     """
-
     :return:
     """
     strategy_id = request.args.get('id')
@@ -514,36 +519,71 @@ def backtest_strategy():
 
 
 @app.route('/results')
+# @login_required
 def display_results():
     """display all the backtest results with selection option
         Returns:
             function: results.html
     """
+    # current_user_id = current_user.id
+    current_user_id = 0
+    user_backests = get_user_backtests(current_user_id)
 
+    #current_user_id = current_user.id
+    # display all user backtest results as a table on the U.I.
     current_user_id = 0
     user_backests = get_user_backtests(current_user_id)
     return render_template("results.html", df=user_backests)
 
 
 @app.route('/plots',  methods=['POST'])
-
+# @login_required
 def run_dash():
-    """run dash app here.
-        redirect to dash url
     """
-    strategy_ids = request.get_data('ids')
+    Run dash app first in this function
+        and then open then dash url in the new window.
+        It will go back to /results for other selections.
+    :return: redirect to /results
+    """
 
-    while True:
-        new_pid = os.fork()
-        if new_pid == 0:
-            child(strategy_ids)
-        else:
-            return redirect("http://127.0.0.1:8050/")
-        reply = input("q for quit / c for new fork")
-        if reply == 'c':
-            continue
-        else:
-            break
+    strategy_ids = list(request.form.get('ids'))
+    cmd = strategy_ids
+    cmd.insert(0, 'dash_app.py')
+    cmd.insert(0, 'python')
+    # print(cmd)
+    # cmd is not correct here
+    proc = subprocess.Popen(['python', 'dash_app.py', '15'],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+    t = threading.Thread(target=output_reader, args=(proc,))
+    t.start()
+
+    try:
+        time.sleep(3)
+        webbrowser.open('http://localhost:8050')
+        # assert b'Directory listing' in resp.read()
+        time.sleep(5)
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=1)
+            print('== subprocess exited with rc =', proc.returncode)
+        except subprocess.TimeoutExpired:
+            print('subprocess did not terminate in time')
+    t.join()
+
+    return redirect('/results')
+
+
+# helper functions
+def output_reader(proc):
+    """
+    Check if subprocess works correctly.
+    :param proc: process
+    :return: None
+    """
+    for line in iter(proc.stdout.readline, b''):
+        print('got line: {0}'.format(line.decode('utf-8')), end='')
 
 
 def get_user_backtests(user_id):
@@ -830,7 +870,7 @@ def main():
     run app
     :return: None
     """
-    app.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
+    app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
 
 
 if __name__ == "__main__":
