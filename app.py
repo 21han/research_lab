@@ -460,6 +460,7 @@ def backtest_progress():
         file_name = f'strategies/user_id_{current_usr}/backtest.csv'
         pnl_df.to_csv(file_name, index=True)
 
+        # TODO: change this to app.config
         bucket = 'coms4156-strategies'
         key = f"{current_usr}/backtest_{strategy_id}.csv"
 
