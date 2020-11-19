@@ -11,16 +11,15 @@ class MockData:
     mock data source
     """
 
-    universe = {
-        'BTC',
-        'ETH',
-        'BNB',
-        'EOS',
-        'USDT',
-        'ATOM'
-    }  # example trade universe
+    universe = {'BTC',
+                'ETH',
+                'BNB',
+                'EOS',
+                'USDT',
+                'ATOM'
+                }  # example trade universe
 
-    balance = 10**6  ## sample balance to mock account info
+    balance = 10 ** 6  ## sample balance to mock account info
 
     def __init__(self):
         pass

@@ -1,3 +1,6 @@
+"""
+CONFIG FILE to load environment variable
+"""
 import os
 
 S3_BUCKET                       = "coms4156-strategies"

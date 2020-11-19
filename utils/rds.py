@@ -2,8 +2,9 @@
 helper method for loading data from rds
 """
 import os
-import pymysql
+
 import pandas as pd
+import pymysql
 
 meta = {
     "host": os.getenv('USER_SERVICE_HOST'),
