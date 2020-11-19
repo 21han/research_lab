@@ -1,14 +1,13 @@
-import os, sys
-import numpy as np
-from dash import Dash
-import plotly.express as px
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-import pandas as pd
 import dash_table as dt
+import numpy as np
+import pandas as pd
+import plotly.express as px
+
+from dash import Dash
 from utils import s3_util, rds
-import flask
 
 #app = flask.Flask(__name__)
 #app.config.from_object("config")
