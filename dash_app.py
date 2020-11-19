@@ -1,23 +1,18 @@
-import os, sys
-import numpy as np
-from dash import Dash
-import plotly.express as px
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-import pandas as pd
 import dash_table as dt
-from utils import s3_util, rds
-import flask
+import numpy as np
+import pandas as pd
+import plotly.express as px
+from dash import Dash
 
-#app = flask.Flask(__name__)
-#app.config.from_object("config")
+from utils import s3_util, rds
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 bucket_name = "coms4156-strategies"
 
-# app = flask.Flask(__name__)
 app = Dash(__name__)
 app.layout = html.Div()
 
@@ -257,17 +252,15 @@ def pnl_summary(data):
     result['Value'].append(str(kurtosis))
 
     # Daily Turnover (optional)
-
     return pd.DataFrame(result)
 
 
 def main(*args):
+    """
 
-    ids = [item for item in args[0][1:]]
+    :param args:
+    :return:
+    """
+    ids = args[0][1:]
     get_plot(ids)
     app.run_server(debug=True)
-
-
-#if __name__ == "__main__":
-#    print(sys.argv)
-#    main(sys.argv)
