@@ -30,8 +30,6 @@ from wtforms.validators import DataRequired, Email, EqualTo, Length, \
 from utils import s3_util, rds
 
 
-
-# set the boto3 logging to critical to suppress warning
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 
@@ -97,8 +95,6 @@ def home():
 
 @app.route("/upload")
 @login_required
-# current page is login required, which means not logging will be
-# redirected
 def upload():
     """home page of the backtesting platform, login is required to access this page
 
@@ -149,12 +145,6 @@ def upload_strategy():
     )
 
     cnt = response["KeyCount"]
-    # '''
-    # WARNING: there is a maxKey in return which is 1000
-    # if there are more than 1000 in actual,
-    # the return might be broken
-    # '''
-
     new_folder = "strategy" + str(cnt + 1)
     strategy_folder = os.path.join(userid, new_folder)
 
@@ -264,7 +254,6 @@ def register():
 
 
 @app.route("/admin", methods=['GET', 'POST'])
-# @login_required
 def admin():
     """render admin user page
 
@@ -325,7 +314,6 @@ def all_strategy():
     current_user_id = current_user.id
     username = current_user.username
     all_user_strategies = get_user_strategies(current_user_id)
-    # display all user strategy as a table on the U.I.
     return render_template(
         'strategies.html',
         df=all_user_strategies,
@@ -398,7 +386,6 @@ def delete_strategy():
     strategy_location = get_strategy_location(strategy_id)
 
     delete_strategy_by_user(strategy_location)
-    # redirect back to strategies
     return redirect('strategies')
 
 
@@ -510,40 +497,31 @@ def backtest_strategy():
     :return:
     """
     strategy_id = request.args.get('id')
-    print(f"Hello {strategy_id}")
     return "nothing"
 
 
 @app.route('/results')
-# @login_required
 def display_results():
     """display all the backtest results with selection option
         Returns:
             function: results.html
     """
-    #current_user_id = current_user.id
     current_user_id = 0
     user_backests = get_user_backtests(current_user_id)
-    # display all user backtest results as a table on the U.I.
     return render_template("results.html", df=user_backests)
 
 
 @app.route('/plots',  methods=['POST'])
-# @login_required
 def run_dash():
     """run dash app here.
         redirect to dash url
     """
     strategy_ids = request.get_data('ids')
-    #print(strategy_ids)
     while True:
-        newpid = os.fork()
-        if newpid == 0:
+        new_pid = os.fork()
+        if new_pid == 0:
             child(strategy_ids)
         else:
-            pids = (os.getpid(), newpid)
-            print("parent: %d, child: %d\n" % pids)
-
             return redirect("http://127.0.0.1:8050/")
         reply = input("q for quit / c for new fork")
         if reply == 'c':
@@ -551,17 +529,15 @@ def run_dash():
         else:
             break
 
-    # return render_template("welcome.html")
-    # return redirect("http://127.0.0.1:8050/")
-    # child process
-    # run dash
-    # redirect to dash
 
-# helper functions
-def child(strategy_ids):
-    print('\nA new child ', os.getpid())
+def child():
+    """
+    get child process
+    :return:
+    """
     os.system('./start_dash.sh')
-    os._exit(0)
+    os.exit(0)
+
 
 def get_user_backtests(user_id):
     """
@@ -623,7 +599,7 @@ def get_strategy_location(strategy_id):
         conn
     )
     s_loc = strategies['strategy_location'].iloc[0]
-    logger.info(f"[db] - {s_loc}")
+    logger.info("[db] - %s}", s_loc)
     return s_loc
 
 
@@ -636,9 +612,6 @@ def allowed_file(filename):
     Returns:
         [bool]: yes for allowed, no for not allowed
     """
-
-    # allowed file extenstion
-    # see config.py
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config[
                "ALLOWED_EXTENSIONS"]
@@ -667,22 +640,16 @@ def upload_strategy_to_s3(
     filename = file.split('/')[-1]
     upload_path = os.path.join(file_prefix, filename)
     try:
-        logger.info(f"uploading file: to path {upload_path}")
+        logger.info("uploading file: to path %s", upload_path)
 
         s3_client.upload_file(
             file,
             bucket_name,
             upload_path,
-            # ExtraArgs={
-            #     "ACL": acl,
-            #     "ContentType": file.content_type
-            # }
         )
 
-    except Exception as e:
-        # This is a catch all exception, edit this part to fit your
-        # needs.
-        print("Something Happened: ", e)
+    except Exception as exp_msg:
+        logger("Something Happened: %s", exp_msg)
         return e
 
     return "{}{}".format(app.config["S3_LOCATION"], upload_path)
@@ -707,17 +674,17 @@ def delete_strategy_by_user(filepath):
         Bucket=bucket_name, Prefix=prefix
     )
     object_cnt = response["KeyCount"]
-    object = response['Contents'][0]  # assume only one match
-    logger.info(f"affected objects = {object_cnt}")
+    s3_object = response['Contents'][0]  # assume only one match
+    logger.info("affected objects = %d", object_cnt)
     logger.info("Delete file from AWS")
-    s3_client.delete_object(Bucket=bucket_name, Key=object['Key'])
+    s3_client.delete_object(Bucket=bucket_name, Key=s3_object['Key'])
     logger.info("Delete file from AWS")
     cursor = conn.cursor()
     query = "DELETE FROM backtest.strategies \
                 WHERE strategy_location = %s"
     cursor.execute(query, (filepath,))
     conn.commit()
-    logger.info(f"affected rows = {cursor.rowcount}")
+    logger.info("affected rows = %d", cursor.rowcount)
     logger.info("Delete file from Database")
 
 
