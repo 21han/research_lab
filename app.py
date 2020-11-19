@@ -520,7 +520,7 @@ def display_results():
             function: results.html
     """
 
-    current_user_id = 0
+    current_user_id = current_user.id
     user_backests = get_user_backtests(current_user_id)
     return render_template("results.html", df=user_backests)
 
