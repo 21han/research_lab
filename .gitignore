@@ -15,3 +15,6 @@ strategies/
 
 # ipy file for testing
 *.ipynb*
+
+.coverage
+*,cover
