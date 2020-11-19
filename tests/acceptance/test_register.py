@@ -27,7 +27,6 @@ class TestRegister(TestBase):
                          "Could not access /register route")
         self.assertIn(b"Register", response.data,
                       "Couldn't find link to /register")
-
     def test_register(self):
         """test register users"""
         response = self.app.get(
@@ -61,5 +60,6 @@ class TestRegister(TestBase):
         cursor.execute(
             query
         )
-
         conn.commit()
+
+
