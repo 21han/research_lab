@@ -2,8 +2,9 @@
 helper method for loading data from rds
 """
 import os
-import pymysql
+
 import pandas as pd
+import pymysql
 
 meta = {
     "host": os.getenv('USER_SERVICE_HOST'),
@@ -49,8 +50,8 @@ def get_all_backtests(user_id):
 
     backtest_df = pd.read_sql(
         f" SELECT s.strategy_name, s.strategy_id, b.backtest_id,"
-        f" b.pnl_location, b.last_modified_date " 
-        f" FROM backtest.strategies s " 
+        f" b.pnl_location, b.last_modified_date "
+        f" FROM backtest.strategies s "
         f" LEFT JOIN backtest.backtests b ON s.strategy_id = b.strategy_id "
         f" WHERE s.user_id = {user_id} AND b.pnl_location is not null"
         f" ORDER BY b.last_modified_date;",
@@ -58,6 +59,7 @@ def get_all_backtests(user_id):
     )
 
     return backtest_df
+
 
 def get_all_loations(strategy_ids):
     """
@@ -71,8 +73,8 @@ def get_all_loations(strategy_ids):
     backtest_df = pd.read_sql(
         f" SELECT s.strategy_name, b.pnl_location"
         f" FROM backtest.strategies s"
-        f" LEFT JOIN backtest.backtests b ON s.strategy_id = b.strategy_id" 
-        f" WHERE b.strategy_id in {ids} AND b.pnl_location is not null" 
+        f" LEFT JOIN backtest.backtests b ON s.strategy_id = b.strategy_id"
+        f" WHERE b.strategy_id in {ids} AND b.pnl_location is not null"
         f" ORDER BY b.last_modified_date; ",
         conn
     )
