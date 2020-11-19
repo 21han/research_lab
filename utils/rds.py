@@ -61,7 +61,7 @@ def get_all_backtests(user_id):
     return backtest_df
 
 
-def get_all_loations(strategy_ids):
+def get_all_locations(strategy_ids):
     """
         get all backtest results of a user
         :param user_id: current user
