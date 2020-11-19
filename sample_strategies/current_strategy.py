@@ -11,7 +11,8 @@ class Strategy:
     """
     a strategy is a class always named as Strategy and it meets two requirements:
         (1) it has defined trading universe
-        (2) it has a run function that returns the portfolio distribution of trading universe for a given day
+        (2) it has a run function that returns the portfolio distribution
+            of trading universe for a given day
     """
 
     # trading universe should not be changed after initialization
