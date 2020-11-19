@@ -29,8 +29,9 @@ from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
 
-from utils import mock_historical_data
 from utils import s3_util, rds
+from utils import mock_historical_data
+
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -42,18 +43,17 @@ logger.setLevel(logging.DEBUG)
 app = Flask(__name__)
 app.config.from_object("config")
 
-
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
-
-TOTAL_CAPITAL = 10**6
+TOTAL_CAPITAL = 10 ** 6
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
+
 
 # endpoint routes
 
@@ -91,6 +91,13 @@ def home():
     :return: redirect user to upload page
     """
     if current_user.is_authenticated:
+        conn = rds.get_connection()
+        userid = pd.read_sql(
+            f"select id from backtest.user where email = '{current_user.email}';",
+            conn
+        )
+        current_user.id = int(userid['id'].iloc[0])
+
         return redirect('upload')
     return render_template('welcome.html', title='About')
 
@@ -228,7 +235,6 @@ def login():
         else:
             flash('Login Unsuccessful. Please check email and password',
                   'danger')
-    
     logger.info("NOT AUTHENTICATED")
     return render_template('login.html', title='Login', form=form)
 
@@ -330,7 +336,12 @@ def get_strategy_to_local(strategy_location):
     :return: local strategy file path
     """
 
-    current_usr = 0
+    conn = rds.get_connection()
+    userid = pd.read_sql(
+        f"select id from backtest.user where email = '{current_user.email}';",
+        conn
+    )
+    current_usr = userid
 
     s3_resource = s3_util.init_s3()
 
@@ -399,7 +410,7 @@ def backtest_progress():
     """
     strategy_id = request.args.get('id')
     logger.info("backtest progress started")
-    current_usr = 0
+    current_usr = current_user.id
 
     s_module = importlib.import_module(
         f"strategies.user_id_{current_usr}.current_strategy")
@@ -433,7 +444,7 @@ def backtest_progress():
             total_value_x = compute_total_value(day_x, day_x_position)
             position_df['value'].append(total_value_x)
 
-        yield f"data:{json.dumps({0:100})}\n\n"
+        yield f"data:{json.dumps({0: 100})}\n\n"
 
         position_df = pd.DataFrame(position_df)
         pnl_df = position_df.diff(-1)
@@ -508,17 +519,20 @@ def display_results():
         Returns:
             function: results.html
     """
+
     current_user_id = 0
     user_backests = get_user_backtests(current_user_id)
     return render_template("results.html", df=user_backests)
 
 
 @app.route('/plots',  methods=['POST'])
+
 def run_dash():
     """run dash app here.
         redirect to dash url
     """
     strategy_ids = request.get_data('ids')
+
     while True:
         new_pid = os.fork()
         if new_pid == 0:
@@ -530,15 +544,6 @@ def run_dash():
             continue
         else:
             break
-
-
-def child():
-    """
-    get child process
-    :return:
-    """
-    os.system('./start_dash.sh')
-    os.exit(0)
 
 
 def get_user_backtests(user_id):
@@ -692,7 +697,6 @@ def delete_strategy_by_user(filepath):
 
 # Forms: registration, login, account
 
-
 class RegistrationForm(FlaskForm):
     """Form contains registered user information
 
@@ -703,17 +707,14 @@ class RegistrationForm(FlaskForm):
         ValidationError: user name exists in the current user table
         ValidationError: email address exists in the current user table
     """
-    username = StringField('Username',
-                           validators=[DataRequired(), Length(min=2, max=20)])
+    username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
-    confirm_password = PasswordField('Confirm Password',
-                                     validators=[DataRequired(),
-                                                 EqualTo('password')])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(),
+                                                                     EqualTo('password')])
     submit = SubmitField('Sign Up')
 
-    @staticmethod
-    def validate_username(username):
+    def validate_username(self, username):
         """check if username exists in the current user table
 
         Args:
@@ -724,11 +725,9 @@ class RegistrationForm(FlaskForm):
         """
         user = User.query.filter_by(username=username.data).first()
         if user:
-            raise ValidationError(
-                'That username is taken. Please choose a different one.')
+            raise ValidationError('That username is taken. Please choose a different one.')
 
-    @staticmethod
-    def validate_email(email):
+    def validate_email(self, email):
         """check if input email address exists in the current user table
 
         Args:
@@ -739,8 +738,7 @@ class RegistrationForm(FlaskForm):
         """
         user = User.query.filter_by(email=email.data).first()
         if user:
-            raise ValidationError(
-                'That email is taken. Please choose a different one.')
+            raise ValidationError('That email is taken. Please choose a different one.')
 
 
 class LoginForm(FlaskForm):
@@ -772,8 +770,7 @@ class UpdateAccountForm(FlaskForm):
                         validators=[FileAllowed(['jpg', 'png'])])
     submit = SubmitField('Update')
 
-    @staticmethod
-    def validate_username(username):
+    def validate_username(self, username):
         """
         check if updated username is duplicate
         :param username: new user name
@@ -786,8 +783,7 @@ class UpdateAccountForm(FlaskForm):
                 raise ValidationError(
                     'That username is taken. Please choose a different one.')
 
-    @staticmethod
-    def validate_email(email):
+    def validate_email(self, email):
         """
         check update email is empty
         :param email: new email

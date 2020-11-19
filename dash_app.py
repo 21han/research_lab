@@ -5,9 +5,10 @@ import dash_table as dt
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from dash import Dash
 
+from dash import Dash
 from utils import s3_util, rds
+
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()

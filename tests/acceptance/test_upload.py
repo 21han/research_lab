@@ -2,7 +2,6 @@
 /login
 """
 from .test_baseclass import TestBase
-from urllib.parse import urlparse
 from utils import rds
 import pandas as pd
 import io
@@ -29,7 +28,7 @@ class TestUpload(TestBase):
         )
         self.assertEqual(response.status_code, 302,
                          "Unable to login for the test user")
-        
+
         data = {'strategy_name': 'strategy'}
         with open('tests/uploads/helpers.py', 'rb') as fh:
             buf = io.BytesIO(fh.read())
@@ -38,13 +37,13 @@ class TestUpload(TestBase):
             "/upload",
             data=data,
         )
-        
+
         self.assertEqual(response.status_code, 200,
                          "User cannot upload a valid file")
         self.assertIn(b"successful", response.data,
                       "file upload is not shown as successful")
-        
-         # 11 is testuser
+
+        # 11 is testuser
         s3_path = "s3://coms4156-strategies/11/strategy3/helpers.py"
         response = self.app.post(
             "/login",
@@ -52,7 +51,7 @@ class TestUpload(TestBase):
                 "email": "testuser@testuser.com",
                 "password": "testuser"},
         )
-        
+
         conn = rds.get_connection()
         strategies = pd.read_sql(
             f"select * from backtest.strategies where strategy_location = '{s3_path}';",
@@ -60,13 +59,12 @@ class TestUpload(TestBase):
         )
         s_id = strategies['strategy_id'].iloc[0]
         response = self.app.post(
-            "/strategy?id="+str(s_id),
+            "/strategy?id=" + str(s_id),
         )
-        
+
         # redirect
         self.assertEqual(response.status_code, 302,
-                         "User cannot delete file")       
-        
+                         "User cannot delete file")
 
     def test_upload_invalid_strategy(self):
         """
@@ -85,14 +83,14 @@ class TestUpload(TestBase):
         )
         self.assertEqual(response.status_code, 302,
                          "Unable to login for the test user")
-        
+
         data = {'strategy_name': 'strategy'}
         data['user_file'] = (io.BytesIO(b"invalid file"), 'helpers.py')
         response = self.app.post(
             "/upload",
             data=data,
         )
-        
+
         self.assertEqual(response.status_code, 200,
                          "User cannot upload a valid file")
         self.assertIn(b"error", response.data,
@@ -115,7 +113,7 @@ class TestUpload(TestBase):
         )
         self.assertEqual(response.status_code, 302,
                          "Unable to login for the test user")
-        
+
         data = {'strategy_name': 'strategy'}
         with open('tests/uploads/helpers.py', 'rb') as fh:
             buf = io.BytesIO(fh.read())
@@ -124,7 +122,7 @@ class TestUpload(TestBase):
             "/upload",
             data=data,
         )
-        
+
         self.assertEqual(response.status_code, 200,
                          "User cannot upload a valid file")
         self.assertIn(b"select a file", response.data,
