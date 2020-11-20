@@ -525,13 +525,9 @@ def display_results():
         Returns:
             function: results.html
     """
-    # current_user_id = current_user.id
-    current_user_id = 0
-    user_backests = get_user_backtests(current_user_id)
 
-    #current_user_id = current_user.id
-    # display all user backtest results as a table on the U.I.
-    current_user_id = 0
+    current_user_id = current_user.id
+
     user_backests = get_user_backtests(current_user_id)
     return render_template("results.html", df=user_backests)
 
