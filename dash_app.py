@@ -5,6 +5,7 @@ import dash_table as dt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import sys
 
 from dash import Dash
 from utils import s3_util, rds
