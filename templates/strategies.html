@@ -1,17 +1,5 @@
-<!doctype html>
-<html lang="en">
-
-<head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
-        integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-
-    <title>strategies</title>
-</head>
+{% extends "layout.html" %}
+{% block content %}
 
 <div class="container">
     <br><br>
@@ -29,30 +17,32 @@
 
     <table class="table table-hover">
         <thead>
-            <tr>
-                <th scope="col">#</th>
-                <th scope="col">Name</th>
-                <th scope="col">Modified Date</th>
-                <th scope="col">Modified User</th>
-                <th scope="col">Action</th>
-            </tr>
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">Name</th>
+            <th scope="col">Modified Date</th>
+            <th scope="col">Modified User</th>
+            <th scope="col">Action</th>
+        </tr>
         </thead>
         <tbody>
-            {% for i,value in df.iterrows() %}
-            <tr>
-                <th scope="row">{{i}}</th>
-                <td>{{value['strategy_name']}}</td>
-                <td>{{value['last_modified_date']}}</td>
-                <td>{{value['last_modified_user']}}</td>
-                <td>
-                    <button id="strategyButton" onclick="strategyButtonFunc({{value['strategy_id']}})" type="button"
-                        class="btn btn-primary">Backtest</button>
-                    <button id="deleteStrategy" onclick="deleteStrategy({{value['strategy_id']}})" type="button"
-                        class="btn btn btn-danger">X</button>
-                </td>
+        {% for i,value in df.iterrows() %}
+        <tr>
+            <th scope="row">{{i}}</th>
+            <td>{{value['strategy_name']}}</td>
+            <td>{{value['last_modified_date']}}</td>
+            <td>{{value['last_modified_user']}}</td>
+            <td>
+                <button id="strategyButton" onclick="strategyButtonFunc({{value['strategy_id']}})" type="button"
+                        class="btn btn-primary">Backtest
+                </button>
+                <button id="deleteStrategy" onclick="deleteStrategy({{value['strategy_id']}})" type="button"
+                        class="btn btn btn-danger">X
+                </button>
+            </td>
 
-            </tr>
-            {% endfor %}
+        </tr>
+        {% endfor %}
         </tbody>
     </table>
 
@@ -110,5 +100,6 @@
 </script>
 
 
+{% endblock content %}
 
-</html>
+
