@@ -73,6 +73,12 @@
     </form>
 </p>
 
+<script>
+    $("input:checkbox").click(function() {
+        var bol = $("input:checkbox:checked").length >= 5;
+        $("input:checkbox").not(":checked").attr("disabled",bol);
+    });
+</script>
 
 <script type="text/javascript">
 			function viewChecked(){

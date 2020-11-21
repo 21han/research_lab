@@ -68,7 +68,7 @@ def get_all_locations(strategy_ids):
         :return: backtest results in pd.dataframe
         """
     conn = get_connection()
-    ids = "( " + " ".join(strategy_ids) + " )"
+    ids = "( " + ",".join(strategy_ids) + " )"
 
     backtest_df = pd.read_sql(
         f" SELECT s.strategy_name, b.pnl_location"

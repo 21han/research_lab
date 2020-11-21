@@ -36,7 +36,6 @@ import dash_app
 from utils import mock_historical_data
 
 
-
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 
@@ -57,10 +56,6 @@ TOTAL_CAPITAL = 10 ** 6
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
-
-
-#subprocess
-pro = None
 
 # endpoint routes
 
@@ -529,7 +524,6 @@ def display_results():
     current_user_id = 0
     user_backests = get_user_backtests(current_user_id)
 
-    #current_user_id = current_user.id
     # display all user backtest results as a table on the U.I.
     current_user_id = 0
     user_backests = get_user_backtests(current_user_id)
@@ -545,14 +539,13 @@ def run_dash():
         It will go back to /results for other selections.
     :return: redirect to /results
     """
-
-    strategy_ids = list(request.form.get('ids'))
+    strategy_ids = request.form.get('ids').split(',')
     cmd = strategy_ids
     cmd.insert(0, 'dash_app.py')
     cmd.insert(0, 'python')
-    # print(cmd)
-    # cmd is not correct here
-    proc = subprocess.Popen(['python', 'dash_app.py', '15'],
+    print(cmd)
+
+    proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
     t = threading.Thread(target=output_reader, args=(proc,))
@@ -560,7 +553,7 @@ def run_dash():
 
     try:
         time.sleep(3)
-        webbrowser.open('http://localhost:8050')
+        webbrowser.open('http://localhost:8050', new=2)
         # assert b'Directory listing' in resp.read()
         time.sleep(5)
     finally:

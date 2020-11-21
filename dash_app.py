@@ -5,19 +5,19 @@ import dash_table as dt
 import numpy as np
 import pandas as pd
 import plotly.express as px
-
+import sys
 from dash import Dash
 from utils import s3_util, rds
-
+from config import S3_BUCKET
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
-bucket_name = "coms4156-strategies"
+bucket_name = S3_BUCKET
 
 dash_app = Dash(__name__)
 dash_app.layout = html.Div()
 
-TOTAL_CAPITAL = 10**6
+TOTAL_CAPITAL = 10 ** 6
 
 
 def fig_update(file_path):
@@ -37,9 +37,9 @@ def fig_update(file_path):
     pnl_df.rename(columns={'Unnamed: 0': 'date', 'value': 'pnl'}, inplace=True)
 
     # pnl_df = pd.read_csv(file_path)
-    pnl_df['pnl'] = pnl_df['pnl'].cumsum()
-    graph_data.append({'x': pnl_df['date'], 'y': pnl_df['pnl']})
-    fig = px.line(pnl_df, x='date', y='pnl')
+    pnl_df['cusum'] = pnl_df['pnl'].cumsum()
+    graph_data.append({'x': pnl_df['date'], 'y': pnl_df['cusum']})
+    fig = px.line(pnl_df, x='date', y='cusum')
 
     fig.update_xaxes(
         rangeslider_visible=True,
@@ -213,12 +213,16 @@ def pnl_summary(data):
     :param data: A dataframe including the backtest results, contains date and pnl two columns.
     :return: A dataframe for making the table, it contains two columns, category name and corresponding values.
     """
+    print(data)
 
     data['cumulative'] = data['pnl'].cumsum()
     result = {'Category': [], 'Value': []}
     total_date = data.shape[0]
+    print(total_date)
+    # (ending value - initial value) / initial value
+    print(data['cumulative'].iloc[-1])
+    return_value = (data['cumulative'].iloc[-1]) / TOTAL_CAPITAL
 
-    return_value = (data['cumulative'].iloc[-1] - data['cumulative'].iloc[0]) / data['cumulative'].iloc[0]
     # Annual return
     annual_return = round(return_value / (total_date / 365) * 100, 2)
     result['Category'].append('Annual Return')
@@ -230,14 +234,16 @@ def pnl_summary(data):
     result['Value'].append(str(cumulative_return) + '%')
 
     # Annual volatility  -->  every value / 10**6
-    daily_change = data['pnl'] / 10**6
-    daily_change.pct_change()
+    daily_change = data['pnl'].div(TOTAL_CAPITAL)
+    daily_change = daily_change.pct_change()
+    print(daily_change)
+
     annual_volatility = round(daily_change.std() * np.sqrt(365), 2)
     result['Category'].append('Annual Volatility')
-    result['Value'].append(str(annual_volatility) + '%')
+    result['Value'].append(str(annual_volatility))
 
     # Sharpe ratio
-    r = data['cumulative'].diff()
+    r = data['pnl'].diff()
     sr = round(r.mean() / r.std() * np.sqrt(365), 2)
     result['Category'].append('Sharpe Ratio')
     result['Value'].append(str(sr))
@@ -257,9 +263,7 @@ def pnl_summary(data):
     result['Category'].append('Kurtosis')
     result['Value'].append(str(kurtosis))
 
-    # Daily Turnover (optional)
     return pd.DataFrame(result)
-
 
 
 def call_dash(*args):
@@ -273,6 +277,7 @@ def call_dash(*args):
 
     dash_app.run_server(host='127.0.0.1', port=8050, debug=False, threaded=True)
 
+
 def main(*args):
     """
 
@@ -282,6 +287,7 @@ def main(*args):
     ids = args[0][1:]
     get_plot(ids)
     app.run_server(debug=False)
+
 
 if __name__ == "__main__":
     call_dash(sys.argv)
