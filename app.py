@@ -157,15 +157,18 @@ def upload_strategy():
     # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
     
     conn = rds.get_connection()
-    strategies = pd.read_sql(
-        f"SELECT MAX(strategy_id) as m "
-        f"FROM backtest.strategies ",
-        conn
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT MAX(strategy_id) as m FROM backtest.strategies"
     )
-    cnt_loc = int(strategies['m'].iloc[0])
+    for id in cursor.fetchall():
+        cnt_loc = id['m']
+        break
+
     logger.info("max + 1 is - %s", cnt_loc+1)
-    new_folder = "strategy" + str(cnt_loc+1)
     
+    new_folder = "strategy" + str(cnt_loc+1)
+
     strategy_folder = os.path.join(userid, new_folder)
 
     # keep a local copy of the file to run pylint
