@@ -32,7 +32,6 @@ from utils import s3_util, rds
 import threading
 import subprocess
 import webbrowser
-import dash_app
 from utils import mock_historical_data
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
@@ -404,6 +403,17 @@ def delete_strategy():
     return redirect('strategies')
 
 
+@app.route('/log_strategy')
+def backtest_strategy():
+    """
+    to help debugging and log strategy before entering into backtest loop
+    :return:
+    """
+    strategy_id = request.args.get('id')
+    logger.info("**strategy id %s", str(strategy_id))
+    return "nothing"
+
+
 @app.route('/backtest_progress')
 def backtest_progress():
     """
@@ -411,7 +421,6 @@ def backtest_progress():
     :return:
     """
     strategy_id = request.args.get('id')
-    logger.info("backtest progress started")
     current_usr = current_user.id
 
     s_module = importlib.import_module(
@@ -425,34 +434,25 @@ def backtest_progress():
     past_n_days = sorted(past_n_days)
 
     def backtest():
-        """
-
-        :return:
-        """
         pnl_df = {
             'pnl': []
         }
+        """ to backtest by iterating through each day"""
         trades = collections.deque(maxlen=2)  # note: we only keep track of today and last day
         for day_x in trange(n_days_back):
-            # TODO: uncomment this in production
-            # one_tenth = n_days_back // 10
-            # if day_x % one_tenth == 0:
-            #     time.sleep(1)
-            progress = {
-                0: min(100 * day_x // n_days_back, 100)
-            }
+            one_tenth = n_days_back // 10
+            if day_x % one_tenth == 0:
+                time.sleep(1)
+            progress = {0: min(100 * day_x // n_days_back, 100)}
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
             current_strategy = s_module.Strategy()
-            # note: for each day, we get current day's position and price
-            day_x_position = current_strategy.get_position()
-            day_x_price = current_strategy.get_price()
+            day_x_position, day_x_price = current_strategy.get_position(), current_strategy.get_price()
             trades.append({'position': day_x_position, 'price': day_x_price})
-            if day_x == 0:
-                total_value_x = 0
-            else:
-                total_value_x = compute_pnl(past_n_days[day_x], trades[0]['position'], trades[1]['price'],
-                                            current_strategy.INIT_CAPITAL)
+            total_value_x = 0 if day_x == 0 else compute_pnl(trades[0]['position'],
+                                                             trades[1]['price'], trades[0]['price'],
+                                                             current_strategy.INIT_CAPITAL)
+
             pnl_df['pnl'].append(total_value_x)
 
         yield f"data:{json.dumps({0: 100})}\n\n"
@@ -460,7 +460,6 @@ def backtest_progress():
         pnl_df['date'] = past_n_days
         key = persist_to_s3(pnl_df, current_usr, strategy_id)
         update_backtest_db(strategy_id, app.config["S3_BUCKET"], key)
-
     return flask.Response(backtest(), mimetype='text/event-stream')
 
 
@@ -483,7 +482,7 @@ def persist_to_s3(pnl_df, current_usr, strategy_id):
 
 def update_backtest_db(strategy_id, bucket, key):
     """
-
+    update backtest result to database
     :param strategy_id:
     :param bucket:
     :param key:
@@ -503,11 +502,11 @@ def update_backtest_db(strategy_id, bucket, key):
     conn.commit()
 
 
-def compute_pnl(day_x, previous_day_position, current_day_price, init_cap):
+def compute_pnl(previous_day_position, prev_day_price, current_day_price, init_cap):
     """
     compute total values on a given day
-    :param day_x:
     :param previous_day_position: previous day position
+    :param prev_day_price: previous day price
     :param current_day_price: current day price
     :param init_cap initial capital
     :return:
@@ -517,24 +516,14 @@ def compute_pnl(day_x, previous_day_position, current_day_price, init_cap):
     if previous_day_position is None:
         return pnl
     for ticker, percent in previous_day_position.items():
-        ticker_quantity = init_cap * percent / current_day_price[ticker]
-        ticker_price = mock_historical_data.MockData.get_price(
-            day_x, ticker)
-        total_positions_usd += ticker_price * ticker_quantity
-    return total_positions_usd - init_cap
-
-
-@app.route('/backtest_strategy')
-def backtest_strategy():
-    """
-    :return:
-    """
-    strategy_id = request.args.get('id')
-    return "nothing"
+        ticker_quantity = init_cap * percent / prev_day_price[ticker]
+        total_positions_usd += current_day_price[ticker] * ticker_quantity
+    pnl = total_positions_usd - init_cap
+    return pnl
 
 
 @app.route('/results')
-# @login_required
+@login_required
 def display_results():
     """display all the backtest results with selection option
         Returns:
