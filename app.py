@@ -29,6 +29,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from pylint.lint import Run
+from pylint import epylint as lint
 from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
@@ -117,7 +118,9 @@ def upload():
     Returns:
         function: render home.html page with context of login user's username
     """
-    context = {"username": current_user.username}
+    context = {"username": current_user.username,
+               "report": "",
+               "message": "Your upload check detail will be shown here"}
     return render_template('upload.html', **context)
 
 
@@ -164,6 +167,11 @@ def upload_strategy():
         return response
     
     local_path = response
+    # Run pylint again to get the message
+    # to pylint_stdout, which is an IO.byte
+    (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
+    pylint_message = pylint_stdout.read()
+    
     strategy_folder = os.path.join(userid, new_folder)
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(
@@ -192,12 +200,14 @@ def upload_strategy():
     shutil.rmtree(local_strategy_folder)
 
     logger.info(f"affected rows = {cursor.rowcount}")
-
     message = "Your strategy " + name + \
               " is uploaded successfully under " + \
               "/".join(filepath.split('/')[-2:]) + " path"
-
-    return message
+              
+    context = {"username": current_user.username,
+               "report": pylint_message,
+               "message": message}
+    return render_template('upload.html', **context)
 
 
 @app.route("/login", methods=['GET', 'POST'])
