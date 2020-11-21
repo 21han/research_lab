@@ -214,10 +214,6 @@ def upload_strategy():
     return render_template('upload.html', **context)
 
 
-
-    # return message
-
-
 @app.route("/login", methods=['GET', 'POST'])
 def login():
     """authenticate current user to access the platform with valid email and
