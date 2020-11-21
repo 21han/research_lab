@@ -32,7 +32,6 @@ from utils import s3_util, rds
 import threading
 import subprocess
 import webbrowser
-import dash_app
 from utils import mock_historical_data
 
 
@@ -56,6 +55,7 @@ TOTAL_CAPITAL = 10 ** 6
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
+
 
 # endpoint routes
 
@@ -550,7 +550,7 @@ def run_dash():
 
     try:
         time.sleep(3)
-        webbrowser.open('http://localhost:8050', new=2)
+        webbrowser.open('http://localhost:8050')
         # assert b'Directory listing' in resp.read()
         time.sleep(5)
     finally:
