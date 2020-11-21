@@ -1,3 +1,6 @@
+"""
+Current strategy
+"""
 import os
 from pprint import pprint
 

@@ -9,8 +9,11 @@ import logging
 import os
 import secrets
 import shutil
+import subprocess
+import threading
 import time
 import collections
+import webbrowser
 import flask
 import pandas as pd
 from PIL import Image
@@ -20,9 +23,11 @@ from flask import request
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, current_user, login_required, \
     login_user, logout_user
+from flask_mail import Message, Mail
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
+from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from pylint.lint import Run
 from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
@@ -32,7 +37,9 @@ from utils import s3_util, rds
 import threading
 import subprocess
 import webbrowser
+from errors.handlers import errors
 from utils import mock_historical_data
+from utils import s3_util, rds
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -54,6 +61,10 @@ login_manager.login_message_category = 'info'
 s3_client = s3_util.init_s3_client()
 
 # subprocess
+
+mail = Mail(app)
+app.register_blueprint(errors)
+
 pro = None
 
 
@@ -98,7 +109,6 @@ def home():
             conn
         )
         current_user.id = int(userid['id'].iloc[0])
-
         return redirect('upload')
     return render_template('welcome.html', title='About')
 
@@ -119,92 +129,77 @@ def upload():
 @login_required
 def upload_strategy():
     """upload user strategy to alchemist database
-    These attributes are also available
-    file.filename               # The actual name of the file
-        file.content_type
-        file.content_length
-        file.mimetype
 
     Returns:
         string: return message of upload status with corresponding pylint score
     """
-
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
         return "Strategy name may not be empty"
     file = request.files["user_file"]
     name = request.form["strategy_name"]
-    if file.filename == "":
-        return "Please select a file"
+    
+    message = check_upload_file(file)
+    if message != "OK":
+        return message
 
-    if not allowed_file(file.filename):
-        return "Your file extension type is not allowed"
-
-    if not file:
-        return "File not found. Please upload it again"
-
-    username = current_user.username
-    userid = str(current_user.id)
     # get the number of folders
     bucket_name = app.config["S3_BUCKET"]
 
     # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
-    response = s3_client.list_objects_v2(
-        Bucket=bucket_name, Prefix=userid
+    
+    conn = rds.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT MAX(strategy_id) as m FROM backtest.strategies"
     )
+    for id in cursor.fetchall():
+        cnt_loc = id['m']
+        break
 
-    cnt = response["KeyCount"]
-    new_folder = "strategy" + str(cnt + 1)
+    logger.info("max + 1 is - %s", cnt_loc+1)
+    new_folder = "strategy" + str(cnt_loc+1)
+
+    userid = str(current_user.id)
+    response = check_py_validity(file, userid, new_folder)
+
+    if '/' not in response:
+        return response
+    
+    local_path = response
     strategy_folder = os.path.join(userid, new_folder)
-
-    # keep a local copy of the file to run pylint
-    local_folder = os.path.join('strategies/', userid)
-    if not os.path.exists(local_folder):
-        os.makedirs(local_folder)
-
-    local_strategy_folder = os.path.join(local_folder, new_folder)
-    os.makedirs(local_strategy_folder)
-    local_path = os.path.join(local_strategy_folder, file.filename)
-    logger.info(f"local testing path is {local_path}")
-    file.save(local_path)
-    result = Run([local_path], do_exit=False)
-
-    # may be need threshold
-    logger.info(result.linter.stats)
-    if "global_note" not in result.linter.stats or \
-            result.linter.stats['global_note'] <= 0:
-        logger.info("wrong file, remove")
-
-        shutil.rmtree(local_strategy_folder)
-        return "Your strategy has error or is not able to run! \
-            correct your file and upload again"
-
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(
-        local_path, bucket_name, strategy_folder)
+        local_path, bucket_name, strategy_folder
+    )
+
     logger.info(f"file uploads to path {filepath}")
-    score = result.linter.stats['global_note']
 
     # store in database
-    conn = rds.get_connection()
     cursor = conn.cursor()
     timestamp = str(datetime.datetime.now())
 
     query = "INSERT INTO backtest.strategies (user_id, strategy_location, \
             last_modified_date, last_modified_user, strategy_name) \
                     VALUES (%s,%s,%s,%s,%s)"
+
+    username = current_user.username
     cursor.execute(
         query, (current_user.id, filepath, timestamp, username, name)
     )
 
     conn.commit()
+    
+    local_folder = os.path.join('strategies/', userid)
+    local_strategy_folder = os.path.join(local_folder, new_folder)
     shutil.rmtree(local_strategy_folder)
+
     logger.info(f"affected rows = {cursor.rowcount}")
 
     message = "Your strategy " + name + \
-              " is uploaded successfully with pylint score " + \
-              str(score) + "/10.00"
+              " is uploaded successfully under " + \
+              "/".join(filepath.split('/')[-2:]) + " path"
 
     return message
 
@@ -575,6 +570,64 @@ def run_dash():
     return redirect('/results')
 
 
+
+@app.route("/reset_password", methods=['GET', 'POST'])
+def reset_request():
+    """
+    send reset passwrod request
+    :return:
+    """
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    form = RequestResetForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        send_reset_email(user)
+        flash('An email has been sent with instructions to reset your password.', 'info')
+        return redirect(url_for('login'))
+    return render_template('reset_request.html', title='Reset Password', form=form)
+
+
+@app.route("/reset_password/<token>", methods=['GET', 'POST'])
+def reset_token(token):
+    """
+    reset secret token
+    :param token:
+    :return:
+    """
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    user = User.verify_reset_token(token)
+    if user is None:
+        flash('That is an invalid or expired token', 'warning')
+        return redirect(url_for('reset_request'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+        user.password = hashed_password
+        db.session.commit()
+        flash('Your password has been updated! You are now able to log in', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset_token.html', title='Reset Password', form=form)
+
+
+def send_reset_email(user):
+    """
+    send reset password request to the registered email
+    :param user:
+    :return:
+    """
+    token = user.get_reset_token()
+    msg = Message('Password Reset Request',
+                  sender='noreply@demo.com',
+                  recipients=[user.email])
+    msg.body = f'''To reset your password, visit the following link:
+{url_for('reset_token', token=token, _external=True)}
+If you did not make this request then simply ignore this email and no changes will be made.
+'''
+    mail.send(msg)
+
+
 # helper functions
 def output_reader(proc):
     """
@@ -663,6 +716,64 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in app.config[
                "ALLOWED_EXTENSIONS"]
 
+
+def check_upload_file(file):
+    """check flask uploaded file
+    These attributes are also available
+    file.filename          # The actual name of the file
+    file.content_type
+    file.content_length
+    file.mimetype
+    Args:
+        file ([request]): in flask.request["file"], io.byte type
+  
+    """
+    if file.filename == "":
+        return "Please select a file"
+
+    if not allowed_file(file.filename):
+        return "Your file extension type is not allowed"
+
+    if not file:
+        return "File not found. Please upload it again"    
+
+    return "OK"
+
+
+def check_py_validity(file, userid, new_folder):
+    """run pylint on file to check if correct
+
+    Args:
+        file (str): flask file
+        userid(int)
+        new_foler: new_folder to save
+    """
+    # keep a local copy of the file to run pylint
+    local_folder = os.path.join('strategies/', userid)
+    if not os.path.exists(local_folder):
+        os.makedirs(local_folder)
+
+    local_strategy_folder = os.path.join(local_folder, new_folder)
+    os.makedirs(local_strategy_folder)
+    local_path = os.path.join(local_strategy_folder, file.filename)
+    logger.info(f"local testing path is {local_path}")
+    file.save(local_path)
+    result = Run([local_path], do_exit=False)
+
+    # may be need threshold
+    logger.info(result.linter.stats)
+    
+    if "global_note" not in result.linter.stats or \
+            result.linter.stats['global_note'] <= 0:
+        logger.info("wrong file, remove")
+
+        shutil.rmtree(local_strategy_folder)
+        return "Your strategy has error or is not able to run! \
+            correct your file and upload again"
+
+    logger.info("testing file has pylint score %s", 
+                result.linter.stats['global_note'])
+    return local_path
 
 def upload_strategy_to_s3(
         file, bucket_name, file_prefix):
@@ -835,6 +946,23 @@ class UpdateAccountForm(FlaskForm):
                 raise ValidationError(
                     'That email is taken. Please choose a different one.')
 
+class RequestResetForm(FlaskForm):
+    email = StringField('Email',
+                        validators=[DataRequired(), Email()])
+    submit = SubmitField('Request Password Reset')
+
+    def validate_email(self, email):
+        user = User.query.filter_by(email=email.data).first()
+        if user is None:
+            raise ValidationError('There is no account with that email. You must register first.')
+
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('Password', validators=[DataRequired()])
+    confirm_password = PasswordField('Confirm Password',
+                                     validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Reset Password')
+
 
 # User object
 
@@ -857,6 +985,29 @@ class User(db.Model, UserMixin):
         nullable=False,
         default='default.jpg')
     password = db.Column(db.String(60), nullable=False)
+
+    def get_reset_token(self, expires_sec=1800):
+        """ get a reset token (expire in 1800 seconds)
+
+        :param expires_sec: set the token expire period to 1800 seconds
+        :return:
+        """
+        s = Serializer(app.config['SECRET_KEY'], expires_sec)
+        return s.dumps({'user_id': self.id}).decode('utf-8')
+
+    @staticmethod
+    def verify_reset_token(token):
+        """ verify reset token
+
+        :param token: secret token
+        :return:
+        """
+        s = Serializer(app.config['SECRET_KEY'])
+        try:
+            user_id = s.loads(token)['user_id']
+        except:
+            return None
+        return User.query.get(user_id)
 
     def __repr__(self):
         """

@@ -4,8 +4,10 @@ this is the test for helper function in app.py
 
 import app
 import os
+import io
 from utils import s3_util
 from config import S3_LOCATION, S3_BUCKET
+
 
 def test_get_strategies():
     """
@@ -81,6 +83,4 @@ def test_compute_pnl():
         {'BTC': 0.2, 'ETH': 0.8},
         {'BTC': 10, 'ETH': 2},
         {'BTC': 9, 'ETH': 1.5}, 100) == (100*0.2/10)*9+(100*0.8/2)*1.5-100
-
-
 

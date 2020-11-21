@@ -1,13 +1,18 @@
 """
 /login
 """
-from .test_baseclass import TestBase
-from utils import rds
-import pandas as pd
 import io
+
+import pandas as pd
+
+from utils import rds
+from .test_baseclass import TestBase
 
 
 class TestUpload(TestBase):
+    """
+    TestUpload
+    """
     def test_upload_valid_strategy_and_delete(self):
         """
         Common cases 1.1: valid upload:
@@ -40,17 +45,12 @@ class TestUpload(TestBase):
 
         self.assertEqual(response.status_code, 200,
                          "User cannot upload a valid file")
-        self.assertIn(b"successful", response.data,
+        self.assertIn(b"successfully", response.data,
                       "file upload is not shown as successful")
 
+        file_suffix = str(response.data).split(' ')[-2]
         # 11 is testuser
-        s3_path = "s3://coms4156-strategies/11/strategy3/helpers.py"
-        response = self.app.post(
-            "/login",
-            data={
-                "email": "testuser@testuser.com",
-                "password": "testuser"},
-        )
+        s3_path = "s3://coms4156-strategies/11/" + file_suffix
 
         conn = rds.get_connection()
         strategies = pd.read_sql(
