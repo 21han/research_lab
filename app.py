@@ -455,6 +455,7 @@ def backtest_progress():
         file_name = f'strategies/user_id_{current_usr}/backtest.csv'
         pnl_df.to_csv(file_name, index=True)
 
+        # TODO: change this to app.config
         bucket = 'coms4156-strategies'
         key = f"{current_usr}/backtest_{strategy_id}.csv"
 
@@ -514,18 +515,14 @@ def backtest_strategy():
 
 
 @app.route('/results')
-# @login_required
+@login_required
 def display_results():
     """display all the backtest results with selection option
         Returns:
             function: results.html
     """
-    # current_user_id = current_user.id
-    current_user_id = 0
-    user_backests = get_user_backtests(current_user_id)
-
     # display all user backtest results as a table on the U.I.
-    current_user_id = 0
+    current_user_id = current_user.id
     user_backests = get_user_backtests(current_user_id)
     return render_template("results.html", df=user_backests)
 
