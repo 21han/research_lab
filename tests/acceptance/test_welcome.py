@@ -6,6 +6,9 @@ from .test_baseclass import TestBase
 
 
 class TestRoot(TestBase):
+    """
+    TestRoot
+    """
     def test_root_directory(self):
         """
         GET /
@@ -13,13 +16,11 @@ class TestRoot(TestBase):
         THEN welcome page should appear
         """
         response = self.app.get('/', content_type='html/text')
-        
         self.assertEqual(
             response.status_code,
             200,
             "not able to get to root directory"
         )
-        
         self.assertIn(
             b'Login',
             response.data,

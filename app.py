@@ -9,7 +9,10 @@ import logging
 import os
 import secrets
 import shutil
+import subprocess
+import threading
 import time
+import webbrowser
 
 import flask
 import pandas as pd
@@ -20,23 +23,20 @@ from flask import request
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, current_user, login_required, \
     login_user, logout_user
+from flask_mail import Message, Mail
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
+from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from pylint.lint import Run
 from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-from utils import s3_util, rds
-import threading
-import subprocess
-import webbrowser
-import dash_app
-from utils import mock_historical_data
-from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
-from flask_mail import Message, Mail
+
 from errors.handlers import errors
+from utils import mock_historical_data
+from utils import s3_util, rds
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -579,6 +579,10 @@ def run_dash():
 
 @app.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
+    """
+    send reset passwrod request
+    :return:
+    """
     if current_user.is_authenticated:
         return redirect(url_for('home'))
     form = RequestResetForm()
@@ -592,6 +596,11 @@ def reset_request():
 
 @app.route("/reset_password/<token>", methods=['GET', 'POST'])
 def reset_token(token):
+    """
+    reset secret token
+    :param token:
+    :return:
+    """
     if current_user.is_authenticated:
         return redirect(url_for('home'))
     user = User.verify_reset_token(token)
@@ -609,6 +618,11 @@ def reset_token(token):
 
 
 def send_reset_email(user):
+    """
+    send reset password request to the registered email
+    :param user:
+    :return:
+    """
     token = user.get_reset_token()
     msg = Message('Password Reset Request',
                   sender='noreply@demo.com',
@@ -955,7 +969,7 @@ def main():
     run app
     :return: None
     """
-    app.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
+    app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
 
 
 if __name__ == "__main__":

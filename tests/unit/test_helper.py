@@ -72,4 +72,3 @@ def test_compute_total_value():
 
     # case 2: date is not None, position is non-empty
     assert app.compute_total_value('2020-11-11', {'BTC': 0.2, 'ETH': 0.8}) > 0
-
