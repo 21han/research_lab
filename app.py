@@ -10,7 +10,7 @@ import os
 import secrets
 import shutil
 import time
-
+import collections
 import flask
 import pandas as pd
 from PIL import Image
@@ -35,8 +35,6 @@ import webbrowser
 import dash_app
 from utils import mock_historical_data
 
-
-
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 
@@ -53,14 +51,12 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
-TOTAL_CAPITAL = 10 ** 6
-
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
-
-#subprocess
+# subprocess
 pro = None
+
 
 # endpoint routes
 
@@ -411,7 +407,7 @@ def delete_strategy():
 @app.route('/backtest_progress')
 def backtest_progress():
     """
-
+    backtest progress
     :return:
     """
     strategy_id = request.args.get('id')
@@ -421,7 +417,7 @@ def backtest_progress():
     s_module = importlib.import_module(
         f"strategies.user_id_{current_usr}.current_strategy")
 
-    n_days_back = 50
+    n_days_back = 365  # we backtest using past 1 year's data
     past_n_days = [
         datetime.datetime.today() -
         datetime.timedelta(
@@ -433,43 +429,56 @@ def backtest_progress():
 
         :return:
         """
-        position_df = {
-            'value': []
+        pnl_df = {
+            'pnl': []
         }
+        trades = collections.deque(maxlen=2)  # note: we only keep track of today and last day
         for day_x in trange(n_days_back):
-            one_tenth = n_days_back // 10
-            if day_x % one_tenth == 0:
-                time.sleep(1)
+            # TODO: uncomment this in production
+            # one_tenth = n_days_back // 10
+            # if day_x % one_tenth == 0:
+            #     time.sleep(1)
             progress = {
                 0: min(100 * day_x // n_days_back, 100)
             }
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
-            day_x_position = s_module.Strategy().run()
-            day_x = past_n_days[day_x]
-            total_value_x = compute_total_value(day_x, day_x_position)
-            position_df['value'].append(total_value_x)
+            current_strategy = s_module.Strategy()
+            # note: for each day, we get current day's position and price
+            day_x_position = current_strategy.get_position()
+            day_x_price = current_strategy.get_price()
+            trades.append({'position': day_x_position, 'price': day_x_price})
+            if day_x == 0:
+                total_value_x = 0
+            else:
+                total_value_x = compute_pnl(past_n_days[day_x], trades[0]['position'], trades[1]['price'],
+                                            current_strategy.INIT_CAPITAL)
+            pnl_df['pnl'].append(total_value_x)
 
         yield f"data:{json.dumps({0: 100})}\n\n"
-
-        position_df = pd.DataFrame(position_df)
-        pnl_df = position_df.diff(-1)
-        pnl_df.index = past_n_days
-        pnl_df.dropna(inplace=True)
-
-        file_name = f'strategies/user_id_{current_usr}/backtest.csv'
-        pnl_df.to_csv(file_name, index=True)
-
-        # TODO: change this to app.config
-        bucket = 'coms4156-strategies'
-        key = f"{current_usr}/backtest_{strategy_id}.csv"
-
-        s3_client = s3_util.init_s3_client()
-        s3_client.upload_file(file_name, bucket, key)
-
-        update_backtest_db(strategy_id, bucket, key)
+        pnl_df = pd.DataFrame(pnl_df)
+        pnl_df['date'] = past_n_days
+        key = persist_to_s3(pnl_df, current_usr, strategy_id)
+        update_backtest_db(strategy_id, app.config["S3_BUCKET"], key)
 
     return flask.Response(backtest(), mimetype='text/event-stream')
+
+
+def persist_to_s3(pnl_df, current_usr, strategy_id):
+    """
+    persist pnl dataframe to s3 under user and strategy path
+    :param pnl_df:
+    :param current_usr:
+    :param strategy_id:
+    :return: the key we persist to
+    """
+    pnl_df = pd.DataFrame(pnl_df)
+    file_name = f'strategies/user_id_{current_usr}/backtest.csv'
+    pnl_df.to_csv(file_name, index=True)
+    key = f"{current_usr}/backtest_{strategy_id}.csv"
+    _s3_client = s3_util.init_s3_client()
+    _s3_client.upload_file(file_name, app.config["S3_BUCKET"], key)
+    return key
 
 
 def update_backtest_db(strategy_id, bucket, key):
@@ -494,20 +503,25 @@ def update_backtest_db(strategy_id, bucket, key):
     conn.commit()
 
 
-def compute_total_value(day_x, day_x_position):
+def compute_pnl(day_x, previous_day_position, current_day_price, init_cap):
     """
     compute total values on a given day
     :param day_x:
-    :param day_x_position:
+    :param previous_day_position: previous day position
+    :param current_day_price: current day price
+    :param init_cap initial capital
     :return:
     """
-    total_value = 0
-
-    for ticker, percent in day_x_position.items():
+    pnl = 0
+    total_positions_usd = 0
+    if previous_day_position is None:
+        return pnl
+    for ticker, percent in previous_day_position.items():
+        ticker_quantity = init_cap * percent / current_day_price[ticker]
         ticker_price = mock_historical_data.MockData.get_price(
             day_x, ticker)
-        total_value += ticker_price * percent * TOTAL_CAPITAL
-    return total_value
+        total_positions_usd += ticker_price * ticker_quantity
+    return total_positions_usd - init_cap
 
 
 @app.route('/backtest_strategy')
@@ -533,7 +547,7 @@ def display_results():
     return render_template("results.html", df=user_backests)
 
 
-@app.route('/plots',  methods=['POST'])
+@app.route('/plots', methods=['POST'])
 # @login_required
 def run_dash():
     """
