@@ -155,12 +155,20 @@ def upload_strategy():
     bucket_name = app.config["S3_BUCKET"]
 
     # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
-    response = s3_client.list_objects_v2(
-        Bucket=bucket_name, Prefix=userid
+    
+    conn = rds.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT MAX(strategy_id) as m FROM backtest.strategies"
     )
+    for id in cursor.fetchall():
+        cnt_loc = id['m']
+        break
 
-    cnt = response["KeyCount"]
-    new_folder = "strategy" + str(cnt + 1)
+    logger.info("max + 1 is - %s", cnt_loc+1)
+    
+    new_folder = "strategy" + str(cnt_loc+1)
+
     strategy_folder = os.path.join(userid, new_folder)
 
     # keep a local copy of the file to run pylint
@@ -192,7 +200,6 @@ def upload_strategy():
     score = result.linter.stats['global_note']
 
     # store in database
-    conn = rds.get_connection()
     cursor = conn.cursor()
     timestamp = str(datetime.datetime.now())
 
