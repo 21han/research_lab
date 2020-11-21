@@ -1,3 +1,8 @@
+"""
+Dash application code.
+Input: a list of strategy ids.
+"""
+import sys
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
@@ -5,14 +10,13 @@ import dash_table as dt
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import sys
 from dash import Dash
 from utils import s3_util, rds
 from config import S3_BUCKET
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
-bucket_name = S3_BUCKET
+BUCKET_NAME = S3_BUCKET
 
 dash_app = Dash(__name__)
 dash_app.layout = html.Div()
@@ -31,10 +35,10 @@ def fig_update(file_path):
     split_path = file_path.split('/')
     prefix = "/".join(split_path[3:])
 
-    csv_obj = s3_client.get_object(Bucket=bucket_name, Key=prefix)
+    csv_obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=prefix)
     pnl_df = pd.read_csv(csv_obj['Body'])
 
-    #pnl_df.rename(columns={'Unnamed: 0': 'date', 'value': 'pnl'}, inplace=True)
+    # pnl_df.rename(columns={'Unnamed: 0': 'date', 'value': 'pnl'}, inplace=True)
 
     # pnl_df = pd.read_csv(file_path)
     pnl_df['cusum'] = pnl_df['pnl'].cumsum()
@@ -95,18 +99,18 @@ def make_table(data):
 def construct_plot(strategy_names, pnl_paths):
     """
     Construct whole structure of plots by given strategy_names, pnl_paths and table_paths.
-    :param strategy_names: A dictionary to map strategy id to strategy name. 
+    :param strategy_names: A dictionary to map strategy id to strategy name.
                            Key is strategy id, value is strategy name
-    :param pnl_paths: A dictionary to map strategy id to corresponding pnl path of csv file. 
+    :param pnl_paths: A dictionary to map strategy id to corresponding pnl path of csv file.
                         Key is strategy id, value is a path string.
     :return: Lively dash layout.
     """
-
     options = []
     for name in strategy_names.keys():
-        options.append({'label': '{}-{}'.format(strategy_names[name], name), 'value': strategy_names[name]})
+        options.append({'label': '{}-{}'.format(strategy_names[name], name),
+                        'value': strategy_names[name]})
 
-    TABLE_STYLE = {
+    table_style = {
         "position": "fixed",
         "top": 70,
         "left": 0,
@@ -116,7 +120,7 @@ def construct_plot(strategy_names, pnl_paths):
         "background-color": "#f8f9fa",
     }
 
-    CONTENT_STYLE = {
+    content_style = {
         "margin-left": "32rem",
         "margin-right": "2rem",
         "padding": "2rem 1rem",
@@ -141,7 +145,7 @@ def construct_plot(strategy_names, pnl_paths):
                             ]
                         )
                     ],
-                    style=CONTENT_STYLE
+                    style=content_style
                 ),
                 html.Div(
                     [
@@ -181,7 +185,7 @@ def construct_plot(strategy_names, pnl_paths):
                             }
                         )
                     ],
-                    style=TABLE_STYLE
+                    style=table_style
                 )
 
             ])
@@ -196,13 +200,12 @@ def get_plot(strategy_ids):
     another is mapping from strategy id to strategy location. And then construct dash plot.
     :return:
     """
-
     backtests = rds.get_all_locations(strategy_ids)
     strategy_names = {}
     pnl_paths = {}
-    for idx, id in enumerate(strategy_ids):
-        strategy_names[id] = backtests['strategy_name'].iloc[idx]
-        pnl_paths[id] = backtests['pnl_location'].iloc[idx]
+    for idx, strategy_id in enumerate(strategy_ids):
+        strategy_names[strategy_id] = backtests['strategy_name'].iloc[idx]
+        pnl_paths[strategy_id] = backtests['pnl_location'].iloc[idx]
 
     dash_app.layout = construct_plot(strategy_names, pnl_paths)
 
@@ -211,16 +214,12 @@ def pnl_summary(data):
     """
     Statistic analysis of backtest result.
     :param data: A dataframe including the backtest results, contains date and pnl two columns.
-    :return: A dataframe for making the table, it contains two columns, category name and corresponding values.
+    :return: A dataframe for making the table, it contains two columns,
+    category name and corresponding values.
     """
-    print(data)
-
     data['cumulative'] = data['pnl'].cumsum()
     result = {'Category': [], 'Value': []}
     total_date = data.shape[0]
-    print(total_date)
-    # (ending value - initial value) / initial value
-    print(data['cumulative'].iloc[-1])
     return_value = (data['cumulative'].iloc[-1]) / TOTAL_CAPITAL
 
     # Annual return
@@ -233,23 +232,22 @@ def pnl_summary(data):
     result['Category'].append('Cumulative Return')
     result['Value'].append(str(cumulative_return) + '%')
 
-    # Annual volatility  -->  every value / 10**6
+    # Annual volatility
     daily_change = data['pnl'].iloc[1:].div(TOTAL_CAPITAL)
-    #daily_change = daily_change.pct_change()
     annual_volatility = round(daily_change.std() * np.sqrt(365), 2)
     result['Category'].append('Annual Volatility')
     result['Value'].append(str(annual_volatility))
 
     # Sharpe ratio
-    r = data['pnl'].div(TOTAL_CAPITAL)
-    sr = round(r.mean() / r.std() * np.sqrt(365), 2)
+    ratio_value = data['pnl'].div(TOTAL_CAPITAL)
+    sharpe_ratio = round(ratio_value.mean() / ratio_value.std() * np.sqrt(365), 2)
     result['Category'].append('Sharpe Ratio')
-    result['Value'].append(str(sr))
+    result['Value'].append(str(sharpe_ratio))
 
     # Max Dropdown
-    md = round((np.max(data['pnl']) - np.min(data['pnl'])) / np.max(data['pnl']), 2)
+    max_drop = round((np.max(data['pnl']) - np.min(data['pnl'])) / np.max(data['pnl']), 2)
     result['Category'].append('Max Dropdown')
-    result['Value'].append(str(md))
+    result['Value'].append(str(max_drop))
 
     # Skew
     skew = round(data['pnl'].skew(), 2)
@@ -284,9 +282,8 @@ def main(*args):
     """
     ids = args[0][1:]
     get_plot(ids)
-    app.run_server(debug=False)
+    dash_app.run_server(debug=False)
 
 
 if __name__ == "__main__":
     call_dash(sys.argv)
-

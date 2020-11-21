@@ -538,7 +538,7 @@ def run_dash():
     cmd = strategy_ids
     cmd.insert(0, 'dash_app.py')
     cmd.insert(0, 'python')
-    print(cmd)
+    # print(cmd)
 
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,

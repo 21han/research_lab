@@ -30,10 +30,10 @@ def test_cumulative_return():
     """
     data = pd.DataFrame({'date': ['2020-10-04 12:09:07', '2020-10-05 16:10:05',
                                   '2020-10-06 12:01:00', '2020-10-07 17:00:00'],
-                         'pnl': [1000, 900, 750, -1500]})
+                         'pnl': [100000, 90000, 75000, -150000]})
 
     result = dash_app.pnl_summary(data)
-    ann_return = str(round(((1000+900+750-1500) / TOTAL_CAPITAL) * 100, 2)) + '%'
+    ann_return = str(round(((100000+90000+75000-150000) / TOTAL_CAPITAL) * 100, 2)) + '%'
     assert ann_return == result['Value'].iloc[1]
 
 
@@ -42,9 +42,9 @@ def test_annual_volatility():
     Test for the annual return calculation.
     :return:
     """
-    data = pd.DataFrame({'date': ['2020-10-04 12:09:07', '2020-10-05 16:10:05',
+    data = pd.DataFrame({'date': ['2020-10-04 12:09:07', '2020-10-04 12:09:07', '2020-10-05 16:10:05',
                                   '2020-10-06 12:01:00', '2020-10-07 17:00:00'],
-                         'pnl': [1000, 900, 750, -1500]})
+                         'pnl': [0, 1000, 900, 750, -1500]})
 
     std = np.std([1000/TOTAL_CAPITAL, 900/TOTAL_CAPITAL, 750/TOTAL_CAPITAL, -1500/TOTAL_CAPITAL], ddof=1)
     result = dash_app.pnl_summary(data)
@@ -61,7 +61,7 @@ def test_sharpe_ratio():
                                   '2020-10-06 12:01:00', '2020-10-07 17:00:00'],
                          'pnl': [1000, -800, 950, 600]})
 
-    cum_shift = data['pnl'].cumsum().diff()
+    cum_shift = data['pnl']
     std = np.std(cum_shift, ddof=1)
     mean = cum_shift.mean()
     result = dash_app.pnl_summary(data)
