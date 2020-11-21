@@ -2,9 +2,10 @@
 This file contains all the tests for the dash_single.py
 """
 
-import dash_app
-import pandas as pd
 import numpy as np
+import pandas as pd
+
+import dash_app
 
 TOTAL_CAPITAL = 10 ** 6
 
