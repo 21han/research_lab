@@ -451,7 +451,6 @@ def backtest_progress():
             pnl_df['pnl'].append(total_value_x)
 
         yield f"data:{json.dumps({0: 100})}\n\n"
-        pnl_df = pd.DataFrame(pnl_df)
         pnl_df['date'] = past_n_days
         key = persist_to_s3(pnl_df, current_usr, strategy_id)
         update_backtest_db(strategy_id, app.config["S3_BUCKET"], key)
