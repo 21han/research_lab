@@ -934,7 +934,7 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(60), nullable=False)
 
     def get_reset_token(self, expires_sec=1800):
-        """
+        """ get a reset token (expire in 1800 seconds)
 
         :param expires_sec: set the token expire period to 1800 seconds
         :return:
@@ -944,9 +944,9 @@ class User(db.Model, UserMixin):
 
     @staticmethod
     def verify_reset_token(token):
-        """
+        """ verify reset token
 
-        :param token:
+        :param token: secret token
         :return:
         """
         s = Serializer(app.config['SECRET_KEY'])
