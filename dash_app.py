@@ -34,7 +34,7 @@ def fig_update(file_path):
     csv_obj = s3_client.get_object(Bucket=bucket_name, Key=prefix)
     pnl_df = pd.read_csv(csv_obj['Body'])
 
-    pnl_df.rename(columns={'Unnamed: 0': 'date', 'value': 'pnl'}, inplace=True)
+    #pnl_df.rename(columns={'Unnamed: 0': 'date', 'value': 'pnl'}, inplace=True)
 
     # pnl_df = pd.read_csv(file_path)
     pnl_df['cusum'] = pnl_df['pnl'].cumsum()
@@ -234,16 +234,14 @@ def pnl_summary(data):
     result['Value'].append(str(cumulative_return) + '%')
 
     # Annual volatility  -->  every value / 10**6
-    daily_change = data['pnl'].div(TOTAL_CAPITAL)
-    daily_change = daily_change.pct_change()
-    print(daily_change)
-
+    daily_change = data['pnl'].iloc[1:].div(TOTAL_CAPITAL)
+    #daily_change = daily_change.pct_change()
     annual_volatility = round(daily_change.std() * np.sqrt(365), 2)
     result['Category'].append('Annual Volatility')
     result['Value'].append(str(annual_volatility))
 
     # Sharpe ratio
-    r = data['pnl'].diff()
+    r = data['pnl'].div(TOTAL_CAPITAL)
     sr = round(r.mean() / r.std() * np.sqrt(365), 2)
     result['Category'].append('Sharpe Ratio')
     result['Value'].append(str(sr))
