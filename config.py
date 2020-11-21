@@ -4,7 +4,7 @@ CONFIG FILE to load environment variable
 import os
 
 S3_BUCKET                       = "coms4156-strategies"
-DB_HOST                         = os.environ.get('ALCHEMIST_RDB_HOST')
+DB_HOST                         = os.environ.get('USER_SERVICE_HOST')
 S3_LOCATION                     = 's3://{}/'.format(S3_BUCKET)
 S3_LOCATION_HTTP                = 'http://{}.s3.amazonaws.com/'.format(S3_BUCKET)
 SECRET_KEY                      = os.urandom(16)
