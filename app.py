@@ -39,7 +39,7 @@ import subprocess
 import webbrowser
 from errors.handlers import errors
 from utils import mock_historical_data
-from utils import s3_util, rds
+
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -60,15 +60,11 @@ login_manager.login_message_category = 'info'
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
-# subprocess
-
 mail = Mail(app)
 app.register_blueprint(errors)
 
-pro = None
-
-
 # endpoint routes
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -523,9 +519,8 @@ def display_results():
         Returns:
             function: results.html
     """
-
+    # display all user backtest results as a table on the U.I.
     current_user_id = current_user.id
-
     user_backests = get_user_backtests(current_user_id)
     return render_template("results.html", df=user_backests)
 
@@ -539,14 +534,12 @@ def run_dash():
         It will go back to /results for other selections.
     :return: redirect to /results
     """
-
-    strategy_ids = list(request.form.get('ids'))
+    strategy_ids = request.form.get('ids').split(',')
     cmd = strategy_ids
     cmd.insert(0, 'dash_app.py')
     cmd.insert(0, 'python')
-    # print(cmd)
-    # cmd is not correct here
-    proc = subprocess.Popen(['python', 'dash_app.py', '15'],
+
+    proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
     t = threading.Thread(target=output_reader, args=(proc,))
@@ -561,9 +554,9 @@ def run_dash():
         proc.terminate()
         try:
             proc.wait(timeout=1)
-            print('== subprocess exited with rc =', proc.returncode)
+            logger.info('== subprocess exited with rc =%d', proc.returncode)
         except subprocess.TimeoutExpired:
-            print('subprocess did not terminate in time')
+            logger.info('subprocess did not terminate in time')
     t.join()
 
     return redirect('/results')
@@ -635,7 +628,7 @@ def output_reader(proc):
     :return: None
     """
     for line in iter(proc.stdout.readline, b''):
-        print('got line: {0}'.format(line.decode('utf-8')), end='')
+        logger.info('got line: {0}'.format(line.decode('utf-8')), end='')
 
 
 def get_user_backtests(user_id):
