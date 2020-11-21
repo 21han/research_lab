@@ -9,7 +9,10 @@ import logging
 import os
 import secrets
 import shutil
+import subprocess
+import threading
 import time
+import webbrowser
 
 import flask
 import pandas as pd
@@ -20,22 +23,20 @@ from flask import request
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, current_user, login_required, \
     login_user, logout_user
+from flask_mail import Message, Mail
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
+from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from pylint.lint import Run
 from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-from utils import s3_util, rds
-import threading
-import subprocess
-import webbrowser
-import dash_app
+
+from errors.handlers import errors
 from utils import mock_historical_data
-
-
+from utils import s3_util, rds
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -57,6 +58,10 @@ TOTAL_CAPITAL = 10 ** 6
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
+
+
+mail = Mail(app)
+app.register_blueprint(errors)
 
 
 #subprocess
@@ -103,7 +108,6 @@ def home():
             conn
         )
         current_user.id = int(userid['id'].iloc[0])
-
         return redirect('upload')
     return render_template('welcome.html', title='About')
 
@@ -579,6 +583,64 @@ def run_dash():
     return redirect('/results')
 
 
+
+@app.route("/reset_password", methods=['GET', 'POST'])
+def reset_request():
+    """
+    send reset passwrod request
+    :return:
+    """
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    form = RequestResetForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        send_reset_email(user)
+        flash('An email has been sent with instructions to reset your password.', 'info')
+        return redirect(url_for('login'))
+    return render_template('reset_request.html', title='Reset Password', form=form)
+
+
+@app.route("/reset_password/<token>", methods=['GET', 'POST'])
+def reset_token(token):
+    """
+    reset secret token
+    :param token:
+    :return:
+    """
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    user = User.verify_reset_token(token)
+    if user is None:
+        flash('That is an invalid or expired token', 'warning')
+        return redirect(url_for('reset_request'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+        user.password = hashed_password
+        db.session.commit()
+        flash('Your password has been updated! You are now able to log in', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset_token.html', title='Reset Password', form=form)
+
+
+def send_reset_email(user):
+    """
+    send reset password request to the registered email
+    :param user:
+    :return:
+    """
+    token = user.get_reset_token()
+    msg = Message('Password Reset Request',
+                  sender='noreply@demo.com',
+                  recipients=[user.email])
+    msg.body = f'''To reset your password, visit the following link:
+{url_for('reset_token', token=token, _external=True)}
+If you did not make this request then simply ignore this email and no changes will be made.
+'''
+    mail.send(msg)
+
+
 # helper functions
 def output_reader(proc):
     """
@@ -839,6 +901,23 @@ class UpdateAccountForm(FlaskForm):
                 raise ValidationError(
                     'That email is taken. Please choose a different one.')
 
+class RequestResetForm(FlaskForm):
+    email = StringField('Email',
+                        validators=[DataRequired(), Email()])
+    submit = SubmitField('Request Password Reset')
+
+    def validate_email(self, email):
+        user = User.query.filter_by(email=email.data).first()
+        if user is None:
+            raise ValidationError('There is no account with that email. You must register first.')
+
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('Password', validators=[DataRequired()])
+    confirm_password = PasswordField('Confirm Password',
+                                     validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Reset Password')
+
 
 # User object
 
@@ -861,6 +940,29 @@ class User(db.Model, UserMixin):
         nullable=False,
         default='default.jpg')
     password = db.Column(db.String(60), nullable=False)
+
+    def get_reset_token(self, expires_sec=1800):
+        """ get a reset token (expire in 1800 seconds)
+
+        :param expires_sec: set the token expire period to 1800 seconds
+        :return:
+        """
+        s = Serializer(app.config['SECRET_KEY'], expires_sec)
+        return s.dumps({'user_id': self.id}).decode('utf-8')
+
+    @staticmethod
+    def verify_reset_token(token):
+        """ verify reset token
+
+        :param token: secret token
+        :return:
+        """
+        s = Serializer(app.config['SECRET_KEY'])
+        try:
+            user_id = s.loads(token)['user_id']
+        except:
+            return None
+        return User.query.get(user_id)
 
     def __repr__(self):
         """

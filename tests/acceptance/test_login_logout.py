@@ -1,11 +1,15 @@
 """
 /login
 """
-from .test_baseclass import TestBase
 from urllib.parse import urlparse
+
+from .test_baseclass import TestBase
 
 
 class TestLoginLogout(TestBase):
+    """
+    TestLoginLogout
+    """
     def test_home_redirect(self):
         """
         GET /home redirects to /login when user is not logged in.

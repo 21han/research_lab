@@ -11,6 +11,9 @@ from app import app
 
 
 class TestBase(unittest.TestCase):
+    """
+    Test Base
+    """
     def setUp(self):
         """
         start app test client,

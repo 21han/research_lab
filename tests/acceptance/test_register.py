@@ -1,13 +1,16 @@
 """
 /register
 """
-from .test_baseclass import TestBase
 from urllib.parse import urlparse
-from utils import rds
 
+from utils import rds
+from .test_baseclass import TestBase
 
 
 class TestRegister(TestBase):
+    """
+    Test register a user
+    """
     def test_register_directory(self):
         """
         GET /register
@@ -61,5 +64,3 @@ class TestRegister(TestBase):
             query
         )
         conn.commit()
-
-

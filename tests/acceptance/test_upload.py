@@ -1,13 +1,18 @@
 """
 /login
 """
-from .test_baseclass import TestBase
-from utils import rds
-import pandas as pd
 import io
+
+import pandas as pd
+
+from utils import rds
+from .test_baseclass import TestBase
 
 
 class TestUpload(TestBase):
+    """
+    TestUpload
+    """
     def test_upload_valid_strategy_and_delete(self):
         """
         Common cases 1.1: valid upload:
