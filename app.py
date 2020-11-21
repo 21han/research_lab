@@ -62,18 +62,12 @@ TOTAL_CAPITAL = 10 ** 6
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
-
-<<<<<<< HEAD
-=======
 mail = Mail(app)
 app.register_blueprint(errors)
 
 
 #subprocess
 pro = None
-
->>>>>>> 13bdb267cab05d5586d145b561a36d754c6be5eb
-# endpoint routes
 
 @login_manager.user_loader
 def load_user(user_id):
