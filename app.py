@@ -108,7 +108,6 @@ def home():
             conn
         )
         current_user.id = int(userid['id'].iloc[0])
-        print(app.config["MAIL_USERNAME"])
         return redirect('upload')
     return render_template('welcome.html', title='About')
 

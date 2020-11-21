@@ -19,7 +19,6 @@ ALLOWED_EXTENSIONS              = {'py'}  # allowed upload file extension
 SQLALCHEMY_TRACK_MODIFICATIONS  = False
 DEBUG                           = True
 PORT                            = 5000
-
 MAIL_SERVER                     = 'smtp.googlemail.com'
 MAIL_PORT                       = 587
 MAIL_USE_TLS                    = True
