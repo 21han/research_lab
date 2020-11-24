@@ -563,7 +563,6 @@ def run_dash():
     return redirect('/results')
 
 
-
 @app.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
     """
