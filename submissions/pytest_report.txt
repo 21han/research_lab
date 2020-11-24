@@ -1,0 +1,45 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.8.5, pytest-6.1.1, py-1.9.0, pluggy-0.13.1 -- /opt/miniconda3/envs/ResearchLab/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/zihan/Columbia/4156_ASE/research_lab
+plugins: dash-1.17.0
+collecting ... collected 29 items
+
+tests/acceptance/test_login_logout.py::TestLoginLogout::test_home_redirect PASSED [  3%]
+tests/acceptance/test_login_logout.py::TestLoginLogout::test_login PASSED [  6%]
+tests/acceptance/test_login_logout.py::TestLoginLogout::test_login_content_page PASSED [ 10%]
+tests/acceptance/test_login_logout.py::TestLoginLogout::test_logout PASSED [ 13%]
+tests/acceptance/test_register.py::TestRegister::test_register PASSED    [ 17%]
+tests/acceptance/test_register.py::TestRegister::test_register_directory PASSED [ 20%]
+tests/acceptance/test_register.py::TestRegister::test_register_page PASSED [ 24%]
+tests/acceptance/test_show_strategies.py::TestStrategies::test_view_strategies PASSED [ 27%]
+tests/acceptance/test_upload.py::TestUpload::test_upload_empty_file PASSED [ 31%]
+tests/acceptance/test_upload.py::TestUpload::test_upload_invalid_strategy PASSED [ 34%]
+tests/acceptance/test_upload.py::TestUpload::test_upload_valid_strategy_and_delete PASSED [ 37%]
+tests/acceptance/test_welcome.py::TestRoot::test_root_directory PASSED   [ 41%]
+tests/acceptance/test_welcome.py::TestRoot::test_welcome_directory PASSED [ 44%]
+tests/unit/test_dash.py::test_annual_return PASSED                       [ 48%]
+tests/unit/test_dash.py::test_cumulative_return PASSED                   [ 51%]
+tests/unit/test_dash.py::test_annual_volatility PASSED                   [ 55%]
+tests/unit/test_dash.py::test_sharpe_ratio PASSED                        [ 58%]
+tests/unit/test_dash.py::test_max_dropdown PASSED                        [ 62%]
+tests/unit/test_dash.py::test_skew PASSED                                [ 65%]
+tests/unit/test_dash.py::test_kurtosis PASSED                            [ 68%]
+tests/unit/test_helper.py::test_get_strategies PASSED                    [ 72%]
+tests/unit/test_helper.py::test_get_strategy_location PASSED             [ 75%]
+tests/unit/test_helper.py::test_allow_file PASSED                        [ 79%]
+tests/unit/test_helper.py::test_upload_strategy PASSED                   [ 82%]
+tests/unit/test_helper.py::test_delete_strategy PASSED                   [ 86%]
+tests/unit/test_helper.py::test_compute_total_value PASSED               [ 89%]
+tests/unit/test_utils.py::test_rds_connection PASSED                     [ 93%]
+tests/unit/test_utils.py::test_s3_client_connection PASSED               [ 96%]
+tests/unit/test_utils.py::test_s3_resource_connection PASSED             [100%]
+
+=============================== warnings summary ===============================
+tests/acceptance/test_upload.py::TestUpload::test_upload_invalid_strategy
+tests/acceptance/test_upload.py::TestUpload::test_upload_valid_strategy_and_delete
+  /opt/miniconda3/envs/ResearchLab/lib/python3.8/site-packages/pylint/lint/run.py:353: DeprecationWarning: do_exit is deprecated and it is going to be removed in a future version.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/warnings.html
+======================== 29 passed, 2 warnings in 8.04s ========================

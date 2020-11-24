@@ -23,7 +23,7 @@ def test_get_strategy_location():
     get_strategy_location(strategy_id)
     NOTE: strategy_id 15 should be fixed
     """
-    location = app.get_strategy_location(15)
+    location = app.get_strategy_location(41)
     assert location.startswith(S3_LOCATION)
 
 

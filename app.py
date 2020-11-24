@@ -434,7 +434,7 @@ def backtest_progress():
             }
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
-            day_x_position = s_module.Strategy().run()
+            day_x_position = s_module.Strategy().get_position()
             day_x = past_n_days[day_x]
             total_value_x = compute_total_value(day_x, day_x_position)
             position_df['value'].append(total_value_x)
