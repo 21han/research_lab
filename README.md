@@ -1,4 +1,7 @@
 ![Pylint](https://github.com/gzhami/research_lab/workflows/Pylint/badge.svg)
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 # research_lab
 
@@ -23,3 +26,22 @@ We use [Covrage](https://coverage.readthedocs.io/en/coverage-5.3/)
 ## Dash
 
 We love visualizations so we took advantage of this [awesome visualization package](https://plotly.com/dash/)
+
+## Contributors ✨
+
+Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tr>
+    <td align="center"><a href="https://www.linkedin.com/in/ericacwei/"><img src="https://avatars0.githubusercontent.com/u/32824389?v=4" width="100px;" alt=""/><br /><sub><b>Chenchen(Erica) Wei</b></sub></a><br /><a href="https://github.com/gzhami/research_lab/commits?author=EricaWei053" title="Code">💻</a></td>
+  </tr>
+</table>
+
+<!-- markdownlint-enable -->
+<!-- prettier-ignore-end -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
