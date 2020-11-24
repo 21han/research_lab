@@ -1,0 +1,25 @@
+Name                                       Stmts   Miss  Cover
+--------------------------------------------------------------
+app.py                                       459    183    60%
+config.py                                     21      0   100%
+dash_app.py                                   89     37    58%
+errors/__init__.py                             0      0   100%
+errors/handlers.py                            15      6    60%
+tests/__init__.py                              0      0   100%
+tests/acceptance/__init__.py                   0      0   100%
+tests/acceptance/test_baseclass.py            11      0   100%
+tests/acceptance/test_login_logout.py         24      0   100%
+tests/acceptance/test_register.py             23      0   100%
+tests/acceptance/test_show_strategies.py       7      0   100%
+tests/acceptance/test_upload.py               40      0   100%
+tests/acceptance/test_welcome.py               9      0   100%
+tests/unit/__init__.py                         0      0   100%
+tests/unit/test_dash.py                       42      0   100%
+tests/unit/test_helper.py                     29      0   100%
+tests/unit/test_utils.py                      14      0   100%
+utils/__init__.py                              0      0   100%
+utils/mock_historical_data.py                 28     12    57%
+utils/rds.py                                  20      7    65%
+utils/s3_util.py                              23      6    74%
+--------------------------------------------------------------
+TOTAL                                        854    251    71%

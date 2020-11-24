@@ -2,37 +2,24 @@
 
 # research_lab
 
-To help algo traders visualize and backtest strategies.
+## How to run
 
-# Environment
+1. Because of security, contact admin zg2391@columbia.edu to add your IP address in order to access our application.
+2. Use `env.yml` to create the correct environment
+3. run `./start.sh` to start flask flask application.
 
-How to create project environment?
+## Testing
 
-* `conda env create -f env.yml` to create the conda environment for this project.
+We use [Pytest](https://docs.pytest.org/en/stable/)
 
-How to update project environment?
+## Style
 
-* You should not update project environment often. If you do need to update, 
-please follow these steps: 
-(1) `rm env.yml` 
-(1.5) make sure you are actually using the correct conda environment
-(2) use `conda env export --no-builds > env.yml` to update the file 
-(3) use `git diff` to check if the change makes sense
-(4) contact repo owner to make change `environment` changes
+We use [Pylint](https://www.pylint.org/)
 
+## Coverage
 
-# Style Check
+We use [Covrage](https://coverage.readthedocs.io/en/coverage-5.3/)
 
-How to check style?
+## Dash
 
-```
-pylint **/*.py
-```
-
-# Coverage Check 
-To check testing coverage 
-
-```
-coverage run  --source=. -m pytest
-coverage report 
-```
+We love visualizations so we took advantage of this [awesome visualization package](https://plotly.com/dash/)
