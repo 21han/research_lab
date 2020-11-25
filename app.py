@@ -43,9 +43,7 @@ from oauthlib.oauth2 import WebApplicationClient
 import requests
 from db import init_db_command
 from user import OAuth_User
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", None)
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", None)
-GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+
 
 
 
@@ -76,16 +74,17 @@ app.register_blueprint(errors)
 # subprocess
 pro = None
 
+# OAuth login
 try:
     init_db_command()
 except sqlite3.OperationalError:
     pass
 
-client = WebApplicationClient(GOOGLE_CLIENT_ID)
+client = WebApplicationClient(app.config["GOOGLE_CLIENT_ID"])
 
 
 def get_google_provider_cfg():
-    return requests.get(GOOGLE_DISCOVERY_URL).json()
+    return requests.get(app.config["GOOGLE_DISCOVERY_URL"]).json()
 
 
 # @app.route("/")
@@ -132,7 +131,7 @@ def callback():
         token_url,
         headers=headers,
         data=body,
-        auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+        auth=(app.config["GOOGLE_CLIENT_ID"], app.config["GOOGLE_CLIENT_SECRET"])
     )
     client.parse_request_body_response(json.dumps(token_response.json()))
     userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
@@ -155,50 +154,27 @@ def callback():
 
 
 
-# # endpoint routes
+# endpoint routes
 
-# @login_manager.user_loader
-# def load_user(user_id):
-#     """User object with input user id
-#
-#     Args:
-#         user_id (int): primary key of user table
-#
-#     Returns:
-#         User: User object with input user id
-#     """
-#     return User.query.get(int(user_id))
-#
-#
+@login_manager.user_loader
+def load_user(user_id):
+    """User object with input user id
+
+    Args:
+        user_id (int): primary key of user table
+
+    Returns:
+        User: User object with input user id
+    """
+    return User.query.get(int(user_id))
+
+
 # @login_manager.user_loader
 # def load_user(user_id):
 #     return OAuth_User.get(user_id)
 
-@login_manager.user_loader
-def load_user(user_id):
-    if OAuth_User:
-        return OAuth_User.get(user_id)
-    else:
-        return User.query.get(int(user_id))
 
 
-# @app.route("/home")
-# @login_required
-# def home():
-#     """
-#     home page after user login
-#
-#     :return: redirect user to upload page
-#     """
-#     if current_user.is_authenticated:
-#         conn = rds.get_connection()
-#         userid = pd.read_sql(
-#             f"select id from backtest.user where email = '{current_user.email}';",
-#             conn
-#         )
-#         current_user.id = int(userid['id'].iloc[0])
-#         return redirect('upload')
-#     return render_template('welcome.html', title='About')
 
 @app.route("/home")
 @login_required
@@ -209,8 +185,26 @@ def home():
     :return: redirect user to upload page
     """
     if current_user.is_authenticated:
+        conn = rds.get_connection()
+        userid = pd.read_sql(
+            f"select id from backtest.user where email = '{current_user.email}';",
+            conn
+        )
+        current_user.id = int(userid['id'].iloc[0])
         return redirect('upload')
     return render_template('welcome.html', title='About')
+
+# @app.route("/home")
+# @login_required
+# def home():
+#     """
+#     home page after user login
+#
+#     :return: redirect user to upload page
+#     """
+#     if current_user.is_authenticated:
+#         return redirect('upload')
+#     return render_template('welcome.html', title='About')
 
 
 
@@ -1083,8 +1077,8 @@ def main():
     run app
     :return: None
     """
-    # app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
-    app.run(ssl_context="adhoc")
+    app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
+    # app.run(ssl_context="adhoc")
 
 
 if __name__ == "__main__":
