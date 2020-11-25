@@ -38,6 +38,17 @@ from errors.handlers import errors
 from utils import mock_historical_data
 from utils import s3_util, rds
 
+import sqlite3
+from oauthlib.oauth2 import WebApplicationClient
+import requests
+from db import init_db_command
+from user import OAuth_User
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", None)
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", None)
+GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+
+
+
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 
@@ -59,39 +70,135 @@ TOTAL_CAPITAL = 10 ** 6
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
-
 mail = Mail(app)
 app.register_blueprint(errors)
 
-
-#subprocess
+# subprocess
 pro = None
 
-# endpoint routes
+try:
+    init_db_command()
+except sqlite3.OperationalError:
+    pass
+
+client = WebApplicationClient(GOOGLE_CLIENT_ID)
+
+
+def get_google_provider_cfg():
+    return requests.get(GOOGLE_DISCOVERY_URL).json()
+
+
+# @app.route("/")
+# def index():
+#     if current_user.is_authenticated:
+#         return (
+#             "<p>Hey there! You're logged in!</p>"
+#             "<p>Username: {}"
+#             "<p>Email: {}</p>"
+#             "<div><p>Google Profile Picture:</p>"
+#             '<img src="{}" alt="Google profile pic"></img></div>'
+#             '<a class="button" href="/logout">Logout</a>'.format(
+#                 current_user.username, current_user.email, current_user.image_file
+#             )
+#         )
+#     else:
+#         return '<a class="button" href="/login">Google Login</a>'
+
+
+@app.route("/OAuth_login")
+def Ologin():
+    google_provider_cfg = get_google_provider_cfg()
+    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
+    request_uri = client.prepare_request_uri(
+        authorization_endpoint,
+        redirect_uri=request.base_url + "/callback",
+        scope=["openid", "email", "profile"]
+    )
+    return redirect(request_uri)
+
+
+@app.route("/OAuth_login/callback")
+def callback():
+    code = request.args.get("code")
+    google_provider_cfg = get_google_provider_cfg()
+    token_endpoint = google_provider_cfg["token_endpoint"]
+    token_url, headers, body = client.prepare_token_request(
+        token_endpoint,
+        authorization_response=request.url,
+        redirect_url=request.base_url,
+        code=code
+    )
+    token_response = requests.post(
+        token_url,
+        headers=headers,
+        data=body,
+        auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+    )
+    client.parse_request_body_response(json.dumps(token_response.json()))
+    userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
+    url, headers, body = client.add_token(userinfo_endpoint)
+    userinfo_response = requests.get(url, headers=headers, data=body)
+    if userinfo_response.json().get("email_verified"):
+        unique_id = userinfo_response.json()["sub"]
+        user_email = userinfo_response.json()["email"]
+        picture = userinfo_response.json()["picture"]
+        user_name = userinfo_response.json()["given_name"]
+    else:
+        return "User email not available or not verified by Google", 400
+    user = OAuth_User(
+        id_=unique_id, username=user_name, email=user_email, image_file=picture
+    )
+    if not OAuth_User.get(unique_id):
+        OAuth_User.create(unique_id, user_name, user_email, picture)
+    login_user(user)
+    return redirect(url_for("home"))
+
+
+
+# # endpoint routes
+
+# @login_manager.user_loader
+# def load_user(user_id):
+#     """User object with input user id
+#
+#     Args:
+#         user_id (int): primary key of user table
+#
+#     Returns:
+#         User: User object with input user id
+#     """
+#     return User.query.get(int(user_id))
+#
+#
+# @login_manager.user_loader
+# def load_user(user_id):
+#     return OAuth_User.get(user_id)
 
 @login_manager.user_loader
 def load_user(user_id):
-    """User object with input user id
-
-    Args:
-        user_id (int): primary key of user table
-
-    Returns:
-        User: User object with input user id
-    """
-    return User.query.get(int(user_id))
+    if OAuth_User:
+        return OAuth_User.get(user_id)
+    else:
+        return User.query.get(int(user_id))
 
 
-@app.route("/")
-@app.route("/welcome")
-def about():
-    """Welcome page of Backtesting platform, introduce features and functionalities of the platform
-
-    Returns:
-        function: render welcome.html page with title About
-    """
-    return render_template('welcome.html', title='About')
-
+# @app.route("/home")
+# @login_required
+# def home():
+#     """
+#     home page after user login
+#
+#     :return: redirect user to upload page
+#     """
+#     if current_user.is_authenticated:
+#         conn = rds.get_connection()
+#         userid = pd.read_sql(
+#             f"select id from backtest.user where email = '{current_user.email}';",
+#             conn
+#         )
+#         current_user.id = int(userid['id'].iloc[0])
+#         return redirect('upload')
+#     return render_template('welcome.html', title='About')
 
 @app.route("/home")
 @login_required
@@ -102,13 +209,63 @@ def home():
     :return: redirect user to upload page
     """
     if current_user.is_authenticated:
-        conn = rds.get_connection()
-        userid = pd.read_sql(
-            f"select id from backtest.user where email = '{current_user.email}';",
-            conn
-        )
-        current_user.id = int(userid['id'].iloc[0])
         return redirect('upload')
+    return render_template('welcome.html', title='About')
+
+
+
+
+
+@app.route("/login", methods=['GET', 'POST'])
+def login():
+    """authenticate current user to access the platform with valid email and
+       password registered in user table
+
+    Returns:
+        function: render login.html page with title Login, redirect user to home page
+        when successfully authenticate
+    """
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user and bcrypt.check_password_hash(user.password,
+                                               form.password.data):
+            login_user(user, remember=form.remember.data)
+            current_user.email = form.email.data
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            else:
+                return redirect(url_for('home'))
+        else:
+            flash('Login Unsuccessful. Please check email and password',
+                  'danger')
+    logger.info("NOT AUTHENTICATED")
+    return render_template('login.html', title='Login', form=form)
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    """logout current user and kill the user's session
+
+    Returns:
+        function: redirect user to welcome page
+    """
+    logout_user()
+    return redirect('welcome')
+
+
+@app.route("/")
+@app.route("/welcome")
+def about():
+    """Welcome page of Backtesting platform, introduce features and functionalities of the platform
+
+    Returns:
+        function: render welcome.html page with title About
+    """
     return render_template('welcome.html', title='About')
 
 
@@ -218,37 +375,6 @@ def upload_strategy():
     return message
 
 
-@app.route("/login", methods=['GET', 'POST'])
-def login():
-    """authenticate current user to access the platform with valid email and
-       password registered in user table
-
-    Returns:
-        function: render login.html page with title Login, redirect user to home page
-        when successfully authenticate
-    """
-
-    if current_user.is_authenticated:
-        return redirect(url_for('home'))
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
-        if user and bcrypt.check_password_hash(user.password,
-                                               form.password.data):
-            login_user(user, remember=form.remember.data)
-            current_user.email = form.email.data
-            next_page = request.args.get('next')
-            if next_page:
-                return redirect(next_page)
-            else:
-                return redirect(url_for('home'))
-        else:
-            flash('Login Unsuccessful. Please check email and password',
-                  'danger')
-    logger.info("NOT AUTHENTICATED")
-    return render_template('login.html', title='Login', form=form)
-
-
 @app.route("/register", methods=['GET', 'POST'])
 def register():
     """register a new user to the platform database
@@ -279,17 +405,6 @@ def admin():
         function: render admin.html page
     """
     return render_template('admin.html')
-
-
-@app.route("/logout")
-def logout():
-    """logout current user and kill the user's session
-
-    Returns:
-        function: redirect user to welcome page
-    """
-    logout_user()
-    return redirect('welcome')
 
 
 @app.route("/account", methods=['GET', 'POST'])
@@ -536,7 +651,7 @@ def display_results():
     return render_template("results.html", df=user_backests)
 
 
-@app.route('/plots',  methods=['POST'])
+@app.route('/plots', methods=['POST'])
 # @login_required
 def run_dash():
     """
@@ -573,7 +688,6 @@ def run_dash():
     t.join()
 
     return redirect('/results')
-
 
 
 @app.route("/reset_password", methods=['GET', 'POST'])
@@ -893,6 +1007,7 @@ class UpdateAccountForm(FlaskForm):
                 raise ValidationError(
                     'That email is taken. Please choose a different one.')
 
+
 class RequestResetForm(FlaskForm):
     email = StringField('Email',
                         validators=[DataRequired(), Email()])
@@ -968,7 +1083,8 @@ def main():
     run app
     :return: None
     """
-    app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
+    # app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
+    app.run(ssl_context="adhoc")
 
 
 if __name__ == "__main__":
