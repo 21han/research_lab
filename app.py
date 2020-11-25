@@ -447,13 +447,10 @@ def backtest_progress():
             progress = {0: min(100 * day_x // n_days_back, 100)}
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
-            current_strategy = s_module.Strategy()
-            day_x_position, day_x_price = current_strategy.get_position(), current_strategy.get_price()
-            trades.append({'position': day_x_position, 'price': day_x_price})
-            total_value_x = 0 if day_x == 0 else compute_pnl(trades[0]['position'],
-                                                             trades[1]['price'], trades[0]['price'],
-                                                             current_strategy.INIT_CAPITAL)
-
+            day_x_position = s_module.Strategy().get_position()
+            day_x = past_n_days[day_x]
+            total_value_x = compute_total_value(day_x, day_x_position)
+            position_df['value'].append(total_value_x)
             pnl_df['pnl'].append(total_value_x)
 
         yield f"data:{json.dumps({0: 100})}\n\n"
@@ -618,6 +615,10 @@ def send_reset_email(user):
     send reset password request to the registered email
     :param user:
     :return:
+    
+    
+    
+    
     """
     token = user.get_reset_token()
     msg = Message('Password Reset Request',
