@@ -64,13 +64,23 @@ def test_delete_strategy():
     assert response["KeyCount"] == 0
 
 
-def test_compute_total_value():
+def test_compute_pnl():
     """
     test compute total value
     :return:
     """
-    # case 1: date is None, position is empty
-    assert app.compute_total_value(None, {}) == 0
+    # case 1: when all is None, we just initialized, return PnL for init today (un-traded state) is 0
+    assert app.compute_pnl(None, None, None, None) == 0
 
-    # case 2: date is not None, position is non-empty
-    assert app.compute_total_value('2020-11-11', {'BTC': 0.2, 'ETH': 0.8}) > 0
+    # case 2: date is not None, position is non-empty; and we made profit
+    assert app.compute_pnl(
+        {'BTC': 0.2, 'ETH': 0.8},
+        {'BTC': 9, 'ETH': 1.5},
+        {'BTC': 10, 'ETH': 2}, 100) == (100*0.2/9)*10+(100*0.8/1.5)*2-100
+
+    # case 3: case we made loss
+    assert app.compute_pnl(
+        {'BTC': 0.2, 'ETH': 0.8},
+        {'BTC': 10, 'ETH': 2},
+        {'BTC': 9, 'ETH': 1.5}, 100) == (100*0.2/10)*9+(100*0.8/2)*1.5-100
+

@@ -12,8 +12,8 @@ import shutil
 import subprocess
 import threading
 import time
+import collections
 import webbrowser
-
 import flask
 import pandas as pd
 from PIL import Image
@@ -29,14 +29,18 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from pylint.lint import Run
+from pylint import epylint as lint
 from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-
+from utils import s3_util, rds
+import threading
+import subprocess
+import webbrowser
 from errors.handlers import errors
 from utils import mock_historical_data
-from utils import s3_util, rds
+
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -54,20 +58,14 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
-TOTAL_CAPITAL = 10 ** 6
-
 # create an s3 client
 s3_client = s3_util.init_s3_client()
-
 
 mail = Mail(app)
 app.register_blueprint(errors)
 
-
-#subprocess
-pro = None
-
 # endpoint routes
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -120,7 +118,9 @@ def upload():
     Returns:
         function: render home.html page with context of login user's username
     """
-    context = {"username": current_user.username}
+    context = {"username": current_user.username,
+               "report": "",
+               "message": "Your upload check detail will be shown here"}
     return render_template('upload.html', **context)
 
 
@@ -167,6 +167,11 @@ def upload_strategy():
         return response
     
     local_path = response
+    # Run pylint again to get the message
+    # to pylint_stdout, which is an IO.byte
+    (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
+    pylint_message = pylint_stdout.read()
+    
     strategy_folder = os.path.join(userid, new_folder)
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(
@@ -195,12 +200,14 @@ def upload_strategy():
     shutil.rmtree(local_strategy_folder)
 
     logger.info(f"affected rows = {cursor.rowcount}")
-
     message = "Your strategy " + name + \
               " is uploaded successfully under " + \
               "/".join(filepath.split('/')[-2:]) + " path"
-
-    return message
+              
+    context = {"username": current_user.username,
+               "report": pylint_message,
+               "message": message}
+    return render_template('upload.html', **context)
 
 
 @app.route("/login", methods=['GET', 'POST'])
@@ -397,20 +404,30 @@ def delete_strategy():
     return redirect('strategies')
 
 
-@app.route('/backtest_progress')
-def backtest_progress():
+@app.route('/log_strategy')
+def backtest_strategy():
     """
-
+    to help debugging and log strategy before entering into backtest loop
     :return:
     """
     strategy_id = request.args.get('id')
-    logger.info("backtest progress started")
+    logger.info("**strategy id %s", str(strategy_id))
+    return "nothing"
+
+
+@app.route('/backtest_progress')
+def backtest_progress():
+    """
+    backtest progress
+    :return:
+    """
+    strategy_id = request.args.get('id')
     current_usr = current_user.id
 
     s_module = importlib.import_module(
         f"strategies.user_id_{current_usr}.current_strategy")
 
-    n_days_back = 50
+    n_days_back = 365  # we backtest using past 1 year's data
     past_n_days = [
         datetime.datetime.today() -
         datetime.timedelta(
@@ -418,52 +435,51 @@ def backtest_progress():
     past_n_days = sorted(past_n_days)
 
     def backtest():
-        """
-
-        :return:
-        """
-        position_df = {
-            'value': []
+        pnl_df = {
+            'pnl': []
         }
+        """ to backtest by iterating through each day"""
+        trades = collections.deque(maxlen=2)  # note: we only keep track of today and last day
         for day_x in trange(n_days_back):
             one_tenth = n_days_back // 10
             if day_x % one_tenth == 0:
                 time.sleep(1)
-            progress = {
-                0: min(100 * day_x // n_days_back, 100)
-            }
+            progress = {0: min(100 * day_x // n_days_back, 100)}
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
             day_x_position = s_module.Strategy().get_position()
             day_x = past_n_days[day_x]
             total_value_x = compute_total_value(day_x, day_x_position)
             position_df['value'].append(total_value_x)
+            pnl_df['pnl'].append(total_value_x)
 
         yield f"data:{json.dumps({0: 100})}\n\n"
-
-        position_df = pd.DataFrame(position_df)
-        pnl_df = position_df.diff(-1)
-        pnl_df.index = past_n_days
-        pnl_df.dropna(inplace=True)
-
-        file_name = f'strategies/user_id_{current_usr}/backtest.csv'
-        pnl_df.to_csv(file_name, index=True)
-
-        # TODO: change this to app.config
-        bucket = 'coms4156-strategies'
-        key = f"{current_usr}/backtest_{strategy_id}.csv"
-
-        s3_client = s3_util.init_s3_client()
-        s3_client.upload_file(file_name, bucket, key)
-
-        update_backtest_db(strategy_id, bucket, key)
-
+        pnl_df['date'] = past_n_days
+        key = persist_to_s3(pnl_df, current_usr, strategy_id)
+        update_backtest_db(strategy_id, app.config["S3_BUCKET"], key)
     return flask.Response(backtest(), mimetype='text/event-stream')
+
+
+def persist_to_s3(pnl_df, current_usr, strategy_id):
+    """
+    persist pnl dataframe to s3 under user and strategy path
+    :param pnl_df:
+    :param current_usr:
+    :param strategy_id:
+    :return: the key we persist to
+    """
+    pnl_df = pd.DataFrame(pnl_df)
+    file_name = f'strategies/user_id_{current_usr}/backtest.csv'
+    pnl_df.to_csv(file_name, index=True)
+    key = f"{current_usr}/backtest_{strategy_id}.csv"
+    _s3_client = s3_util.init_s3_client()
+    _s3_client.upload_file(file_name, app.config["S3_BUCKET"], key)
+    return key
 
 
 def update_backtest_db(strategy_id, bucket, key):
     """
-
+    update backtest result to database
     :param strategy_id:
     :param bucket:
     :param key:
@@ -483,46 +499,40 @@ def update_backtest_db(strategy_id, bucket, key):
     conn.commit()
 
 
-def compute_total_value(day_x, day_x_position):
+def compute_pnl(previous_day_position, prev_day_price, current_day_price, init_cap):
     """
     compute total values on a given day
-    :param day_x:
-    :param day_x_position:
+    :param previous_day_position: previous day position
+    :param prev_day_price: previous day price
+    :param current_day_price: current day price
+    :param init_cap initial capital
     :return:
     """
-    total_value = 0
-
-    for ticker, percent in day_x_position.items():
-        ticker_price = mock_historical_data.MockData.get_price(
-            day_x, ticker)
-        total_value += ticker_price * percent * TOTAL_CAPITAL
-    return total_value
-
-
-@app.route('/backtest_strategy')
-def backtest_strategy():
-    """
-    :return:
-    """
-    strategy_id = request.args.get('id')
-    return "nothing"
+    pnl = 0
+    total_positions_usd = 0
+    if previous_day_position is None:
+        return pnl
+    for ticker, percent in previous_day_position.items():
+        ticker_quantity = init_cap * percent / prev_day_price[ticker]
+        total_positions_usd += current_day_price[ticker] * ticker_quantity
+    pnl = total_positions_usd - init_cap
+    return pnl
 
 
 @app.route('/results')
-# @login_required
+@login_required
 def display_results():
     """display all the backtest results with selection option
         Returns:
             function: results.html
     """
-
+    # display all user backtest results as a table on the U.I.
     current_user_id = current_user.id
-
     user_backests = get_user_backtests(current_user_id)
     return render_template("results.html", df=user_backests)
 
 
-@app.route('/plots',  methods=['POST'])
+@app.route('/plots', methods=['POST'])
 # @login_required
 def run_dash():
     """
@@ -531,14 +541,12 @@ def run_dash():
         It will go back to /results for other selections.
     :return: redirect to /results
     """
-
-    strategy_ids = list(request.form.get('ids'))
+    strategy_ids = request.form.get('ids').split(',')
     cmd = strategy_ids
     cmd.insert(0, 'dash_app.py')
     cmd.insert(0, 'python')
-    # print(cmd)
-    # cmd is not correct here
-    proc = subprocess.Popen(['python', 'dash_app.py', '15'],
+
+    proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
     t = threading.Thread(target=output_reader, args=(proc,))
@@ -553,9 +561,9 @@ def run_dash():
         proc.terminate()
         try:
             proc.wait(timeout=1)
-            print('== subprocess exited with rc =', proc.returncode)
+            logger.info('== subprocess exited with rc =%d', proc.returncode)
         except subprocess.TimeoutExpired:
-            print('subprocess did not terminate in time')
+            logger.info('subprocess did not terminate in time')
     t.join()
 
     return redirect('/results')
@@ -607,6 +615,10 @@ def send_reset_email(user):
     send reset password request to the registered email
     :param user:
     :return:
+    
+    
+    
+    
     """
     token = user.get_reset_token()
     msg = Message('Password Reset Request',
@@ -627,7 +639,7 @@ def output_reader(proc):
     :return: None
     """
     for line in iter(proc.stdout.readline, b''):
-        print('got line: {0}'.format(line.decode('utf-8')), end='')
+        logger.info('got line: {0}'.format(line.decode('utf-8')), end='')
 
 
 def get_user_backtests(user_id):
