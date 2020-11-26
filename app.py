@@ -146,18 +146,15 @@ def callback():
 
 # endpoint routes
 
-# @login_manager.user_loader
-# def load_user(user_id):
-#     """User object with input user id
-#
-#     Args:
-#         user_id (int): primary key of user table
-#
-#     Returns:
-#         User: User object with input user id
-#     """
-#     return User.query.get(int(user_id))
-#
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    if not OAuthUser.get(user_id):
+        return User.query.get(int(user_id))
+    return OAuthUser.get(user_id)
+
+
 # @app.route("/home")
 # @login_required
 # def home():
@@ -177,9 +174,7 @@ def callback():
 #     return render_template('welcome.html', title='About')
 
 
-@login_manager.user_loader
-def load_user(user_id):
-    return OAuthUser.get(user_id)
+
 
 @app.route("/home")
 @login_required
