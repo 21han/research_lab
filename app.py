@@ -1020,13 +1020,6 @@ class User(db.Model, UserMixin):
         return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
-def main():
-    """
-    run application
-    :return: None
-    """
-    application.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
-
-
 if __name__ == "__main__":
-    main()
+    application.debug = True
+    application.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
