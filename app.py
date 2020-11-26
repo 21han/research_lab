@@ -450,7 +450,7 @@ def backtest_progress():
             yield ret_string
             day_x_position = s_module.Strategy().get_position()
             day_x = past_n_days[day_x]
-            total_value_x = compute_total_value(day_x, day_x_position)
+            total_value_x = compute_pnl(day_x, day_x_position)
             position_df['value'].append(total_value_x)
             pnl_df['pnl'].append(total_value_x)
 
