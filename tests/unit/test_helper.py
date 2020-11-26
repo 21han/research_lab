@@ -2,9 +2,8 @@
 this is the test for helper function in application.py
 """
 
-import app
+import application as app
 import os
-import io
 from utils import s3_util
 from config import S3_LOCATION, S3_BUCKET
 

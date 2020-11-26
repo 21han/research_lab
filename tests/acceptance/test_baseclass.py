@@ -7,7 +7,7 @@ alchemist
 
 import unittest
 # import sh
-from app import application
+from application import application
 
 
 class TestBase(unittest.TestCase):

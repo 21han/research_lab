@@ -3,4 +3,5 @@ source .cred
 
 # flask settings
 export FLASK_ENV='development'
-python app.py
+python application.py
+./st
