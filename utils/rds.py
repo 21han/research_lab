@@ -32,9 +32,17 @@ def get_all_strategies(user_id):
     """
     conn = get_connection()
     strategy_df = pd.read_sql(
-        f"select * "
-        f"from backtest.strategies  "
-        f"where user_id = {user_id}",
+        f"SELECT bs.user_id, bs.strategy_id, "
+        f"bs.last_modified_date, bs.last_modified_user, bs.strategy_name "
+        f"FROM backtest.strategies bs "
+        f"JOIN ("
+        f" SELECT strategy_name, "
+        f" MAX(last_modified_date) as last_modified_date "
+        f" FROM backtest.strategies "
+        f" GROUP BY strategy_name "
+        f") AS lm on bs.strategy_name = lm.strategy_name "
+        f"AND bs.last_modified_date=lm.last_modified_date "
+        f"WHERE user_id = {user_id}",
         conn
     )
     return strategy_df
@@ -68,7 +76,7 @@ def get_all_locations(strategy_ids):
         :return: backtest results in pd.dataframe
         """
     conn = get_connection()
-    ids = "( " + " ".join(strategy_ids) + " )"
+    ids = "( " + ",".join(strategy_ids) + " )"
 
     backtest_df = pd.read_sql(
         f" SELECT s.strategy_name, b.pnl_location"

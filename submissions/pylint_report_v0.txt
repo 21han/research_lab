@@ -1,0 +1,23 @@
+************* Module errors.handlers
+errors/handlers.py:18:0: C0304: Final newline missing (missing-final-newline)
+errors/handlers.py:1:0: C0114: Missing module docstring (missing-module-docstring)
+errors/handlers.py:7:0: C0116: Missing function or method docstring (missing-function-docstring)
+errors/handlers.py:7:14: W0613: Unused argument 'error' (unused-argument)
+errors/handlers.py:12:0: C0116: Missing function or method docstring (missing-function-docstring)
+errors/handlers.py:12:14: W0613: Unused argument 'error' (unused-argument)
+errors/handlers.py:17:0: C0116: Missing function or method docstring (missing-function-docstring)
+errors/handlers.py:17:14: W0613: Unused argument 'error' (unused-argument)
+************* Module current_strategy
+sample_strategies/current_strategy.py:10:0: R0903: Too few public methods (1/2) (too-few-public-methods)
+************* Module utils.s3_util
+utils/s3_util.py:1:0: R0801: Similar lines in 2 files
+==current_strategy:20
+==utils.mock_historical_data:14
+                'ETH',
+                'BNB',
+                'EOS',
+                'USDT',
+                'ATOM' (duplicate-code)
+
+------------------------------------------------------------------
+Your code has been rated at 8.82/10 (previous run: 8.82/10, +0.00)

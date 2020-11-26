@@ -1,6 +1,8 @@
 """
 Error handers
 """
+import logging
+
 from flask import Blueprint, render_template
 
 import logging
@@ -15,7 +17,9 @@ def error_404(error):
     :param error:
     :return:
     """
-    logging.error("404", error)
+
+    logging.error("Error: %s", error)
+
     return render_template('errors/404.html'), 404
 
 
@@ -26,7 +30,9 @@ def error_403(error):
     :param error:
     :return:
     """
-    logging.error("403", error)
+
+    logging.error("Error: %s", error)
+
     return render_template('errors/403.html'), 403
 
 
@@ -37,5 +43,6 @@ def error_500(error):
     :param error:
     :return:
     """
-    logging.error("500", error)
+
+    logging.error("Error: %s", error)
     return render_template('errors/500.html'), 500
