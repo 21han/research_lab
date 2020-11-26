@@ -38,14 +38,10 @@ from errors.handlers import errors
 from utils import mock_historical_data
 from utils import s3_util, rds
 
-import sqlite3
+
 from oauthlib.oauth2 import WebApplicationClient
 import requests
-from db import init_db_command
-from user import OAuth_User
-
-
-
+from user import OAuthUser
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -73,12 +69,6 @@ app.register_blueprint(errors)
 
 # subprocess
 pro = None
-
-# OAuth login
-try:
-    init_db_command()
-except sqlite3.OperationalError:
-    pass
 
 client = WebApplicationClient(app.config["GOOGLE_CLIENT_ID"])
 
@@ -142,39 +132,54 @@ def callback():
         user_email = userinfo_response.json()["email"]
         picture = userinfo_response.json()["picture"]
         user_name = userinfo_response.json()["given_name"]
+        current_user.email = user_email
     else:
         return "User email not available or not verified by Google", 400
-    user = OAuth_User(
+    user = OAuthUser(
         id_=unique_id, username=user_name, email=user_email, image_file=picture
     )
-    if not OAuth_User.get(unique_id):
-        OAuth_User.create(unique_id, user_name, user_email, picture)
+    if not OAuthUser.get(unique_id):
+        OAuthUser.create(unique_id, user_name, user_email, picture)
     login_user(user)
     return redirect(url_for("home"))
 
 
-
 # endpoint routes
-
-@login_manager.user_loader
-def load_user(user_id):
-    """User object with input user id
-
-    Args:
-        user_id (int): primary key of user table
-
-    Returns:
-        User: User object with input user id
-    """
-    return User.query.get(int(user_id))
-
 
 # @login_manager.user_loader
 # def load_user(user_id):
-#     return OAuth_User.get(user_id)
+#     """User object with input user id
+#
+#     Args:
+#         user_id (int): primary key of user table
+#
+#     Returns:
+#         User: User object with input user id
+#     """
+#     return User.query.get(int(user_id))
+#
+# @app.route("/home")
+# @login_required
+# def home():
+#     """
+#     home page after user login
+#
+#     :return: redirect user to upload page
+#     """
+#     if current_user.is_authenticated:
+#         conn = rds.get_connection()
+#         userid = pd.read_sql(
+#             f"select id from backtest.user where email = '{current_user.email}';",
+#             conn
+#         )
+#         current_user.id = int(userid['id'].iloc[0])
+#         return redirect('upload')
+#     return render_template('welcome.html', title='About')
 
 
-
+@login_manager.user_loader
+def load_user(user_id):
+    return OAuthUser.get(user_id)
 
 @app.route("/home")
 @login_required
@@ -185,29 +190,8 @@ def home():
     :return: redirect user to upload page
     """
     if current_user.is_authenticated:
-        conn = rds.get_connection()
-        userid = pd.read_sql(
-            f"select id from backtest.user where email = '{current_user.email}';",
-            conn
-        )
-        current_user.id = int(userid['id'].iloc[0])
         return redirect('upload')
     return render_template('welcome.html', title='About')
-
-# @app.route("/home")
-# @login_required
-# def home():
-#     """
-#     home page after user login
-#
-#     :return: redirect user to upload page
-#     """
-#     if current_user.is_authenticated:
-#         return redirect('upload')
-#     return render_template('welcome.html', title='About')
-
-
-
 
 
 @app.route("/login", methods=['GET', 'POST'])
@@ -1077,8 +1061,8 @@ def main():
     run app
     :return: None
     """
-    app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
-    # app.run(ssl_context="adhoc")
+    # app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
+    app.run(ssl_context="adhoc")
 
 
 if __name__ == "__main__":
