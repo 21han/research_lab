@@ -82,7 +82,7 @@ PyYAML==5.3.1
 requests==2.24.0
 retrying==1.3.3
 s3transfer==0.3.3
-setuptools==49.6.0.post20200925
+setuptools==49.6.0
 six==1.15.0
 slugify==0.0.1
 SQLAlchemy==1.3.20
