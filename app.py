@@ -132,7 +132,7 @@ def callback():
         user_email = userinfo_response.json()["email"]
         picture = userinfo_response.json()["picture"]
         user_name = userinfo_response.json()["given_name"]
-        current_user.email = user_email
+        current_user.id = int(unique_id)
     else:
         return "User email not available or not verified by Google", 400
     user = OAuthUser(
