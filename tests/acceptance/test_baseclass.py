@@ -7,7 +7,7 @@ alchemist
 
 import unittest
 # import sh
-from app import app
+from app import application
 
 
 class TestBase(unittest.TestCase):
@@ -16,13 +16,13 @@ class TestBase(unittest.TestCase):
     """
     def setUp(self):
         """
-        start app test client,
+        start application test client,
         This function runs once before each member function unit test.
         """
-        app.config['TESTING'] = True
-        app.config['WTF_CSRF_ENABLED'] = False
-        self.app = app.test_client()
-        self.app_context = app.app_context()
+        application.config['TESTING'] = True
+        application.config['WTF_CSRF_ENABLED'] = False
+        self.app = application.test_client()
+        self.app_context = application.app_context()
         self.app_context.push()
 
     def tearDown(self):
