@@ -538,7 +538,6 @@ def run_dash():
     cmd = strategy_ids
     cmd.insert(0, 'dash_app.py')
     cmd.insert(0, 'python')
-    # print(cmd)
 
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
@@ -555,9 +554,9 @@ def run_dash():
         proc.terminate()
         try:
             proc.wait(timeout=1)
-            print('== subprocess exited with rc =', proc.returncode)
+            logger.info('== subprocess exited with rc =%d', proc.returncode)
         except subprocess.TimeoutExpired:
-            print('subprocess did not terminate in time')
+            logger.info('subprocess did not terminate in time')
     t.join()
 
     return redirect('/results')
@@ -628,7 +627,7 @@ def output_reader(proc):
     :return: None
     """
     for line in iter(proc.stdout.readline, b''):
-        print('got line: {0}'.format(line.decode('utf-8')), end='')
+        logger.info('got line: {0}'.format(line.decode('utf-8')), end='')
 
 
 def get_user_backtests(user_id):
