@@ -1,0 +1,42 @@
+{
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "contributors": [
+    {
+      "login": "EricaWei053",
+      "name": "Chenchen(Erica) Wei",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/32824389?v=4",
+      "profile": "https://www.linkedin.com/in/ericacwei/",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "jialiaz3",
+      "name": "Jialiaz3",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/39682327?v=4",
+      "profile": "https://github.com/jialiaz3",
+      "contributions": [
+        "ideas"
+      ]
+    },
+    {
+      "login": "linxiaow",
+      "name": "Linxiao Wu",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/43714531?v=4",
+      "profile": "https://github.com/linxiaow",
+      "contributions": [
+        "bug"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "projectName": "research_lab",
+  "projectOwner": "gzhami",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "skipCi": true
+}

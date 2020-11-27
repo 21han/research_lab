@@ -47,7 +47,7 @@ class TestUpload(TestBase):
                          "User cannot upload a valid file")
         self.assertIn(b"successfully", response.data,
                       "file upload is not shown as successful")
-
+        
         file_suffix = str(response.data).split(' ')[-2]
         # 11 is testuser
         s3_path = "s3://coms4156-strategies/11/" + file_suffix

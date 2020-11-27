@@ -1,5 +1,5 @@
 """
-app.py
+application.py
 """
 
 import datetime
@@ -29,6 +29,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from pylint.lint import Run
+from pylint import epylint as lint
 from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
@@ -48,20 +49,21 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-app = Flask(__name__)
-app.config.from_object("config")
+application = Flask(__name__)
 
-db = SQLAlchemy(app)
-bcrypt = Bcrypt(app)
-login_manager = LoginManager(app)
+application.config.from_object("config")
+
+db = SQLAlchemy(application)
+bcrypt = Bcrypt(application)
+login_manager = LoginManager(application)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
-mail = Mail(app)
-app.register_blueprint(errors)
+mail = Mail(application)
+application.register_blueprint(errors)
 
 # endpoint routes
 
@@ -79,8 +81,8 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-@app.route("/")
-@app.route("/welcome")
+@application.route("/")
+@application.route("/welcome")
 def about():
     """Welcome page of Backtesting platform, introduce features and functionalities of the platform
 
@@ -90,7 +92,7 @@ def about():
     return render_template('welcome.html', title='About')
 
 
-@app.route("/home")
+@application.route("/home")
 @login_required
 def home():
     """
@@ -109,7 +111,7 @@ def home():
     return render_template('welcome.html', title='About')
 
 
-@app.route("/upload")
+@application.route("/upload")
 @login_required
 def upload():
     """home page of the backtesting platform, login is required to access this page
@@ -117,11 +119,13 @@ def upload():
     Returns:
         function: render home.html page with context of login user's username
     """
-    context = {"username": current_user.username}
+    context = {"username": current_user.username,
+               "report": "",
+               "message": "Your upload check detail will be shown here"}
     return render_template('upload.html', **context)
 
 
-@app.route("/upload", methods=["POST"])
+@application.route("/upload", methods=["POST"])
 @login_required
 def upload_strategy():
     """upload user strategy to alchemist database
@@ -141,7 +145,7 @@ def upload_strategy():
         return message
 
     # get the number of folders
-    bucket_name = app.config["S3_BUCKET"]
+    bucket_name = application.config["S3_BUCKET"]
 
     # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
     
@@ -164,6 +168,11 @@ def upload_strategy():
         return response
     
     local_path = response
+    # Run pylint again to get the message
+    # to pylint_stdout, which is an IO.byte
+    (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
+    pylint_message = pylint_stdout.read()
+    
     strategy_folder = os.path.join(userid, new_folder)
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(
@@ -192,15 +201,17 @@ def upload_strategy():
     shutil.rmtree(local_strategy_folder)
 
     logger.info(f"affected rows = {cursor.rowcount}")
-
     message = "Your strategy " + name + \
               " is uploaded successfully under " + \
               "/".join(filepath.split('/')[-2:]) + " path"
+              
+    context = {"username": current_user.username,
+               "report": pylint_message,
+               "message": message}
+    return render_template('upload.html', **context)
 
-    return message
 
-
-@app.route("/login", methods=['GET', 'POST'])
+@application.route("/login", methods=['GET', 'POST'])
 def login():
     """authenticate current user to access the platform with valid email and
        password registered in user table
@@ -231,7 +242,7 @@ def login():
     return render_template('login.html', title='Login', form=form)
 
 
-@app.route("/register", methods=['GET', 'POST'])
+@application.route("/register", methods=['GET', 'POST'])
 def register():
     """register a new user to the platform database
 
@@ -253,7 +264,7 @@ def register():
         'register.html', title='Register', form=form)
 
 
-@app.route("/admin", methods=['GET', 'POST'])
+@application.route("/admin", methods=['GET', 'POST'])
 def admin():
     """render admin user page
 
@@ -263,7 +274,7 @@ def admin():
     return render_template('admin.html')
 
 
-@app.route("/logout")
+@application.route("/logout")
 def logout():
     """logout current user and kill the user's session
 
@@ -274,7 +285,7 @@ def logout():
     return redirect('welcome')
 
 
-@app.route("/account", methods=['GET', 'POST'])
+@application.route("/account", methods=['GET', 'POST'])
 @login_required
 def account():
     """display current user's account information and allows the current user to
@@ -302,7 +313,7 @@ def account():
                            image_file=image_file, form=form)
 
 
-@app.route('/strategies')
+@application.route('/strategies')
 @login_required
 def all_strategy():
     """display all user strategy as a table on the U.I.
@@ -359,7 +370,7 @@ def get_strategy_to_local(strategy_location):
     return local_strategy_path
 
 
-@app.route('/strategy')
+@application.route('/strategy')
 def display_strategy():
     """display select strategy with id
 
@@ -380,7 +391,7 @@ def display_strategy():
         'strategy.html', strategy_id=strategy_id, code=code_snippet, num_bars=1)
 
 
-@app.route('/strategy', methods=["POST"])
+@application.route('/strategy', methods=["POST"])
 @login_required
 def delete_strategy():
     """
@@ -394,7 +405,7 @@ def delete_strategy():
     return redirect('strategies')
 
 
-@app.route('/log_strategy')
+@application.route('/log_strategy')
 def backtest_strategy():
     """
     to help debugging and log strategy before entering into backtest loop
@@ -405,7 +416,7 @@ def backtest_strategy():
     return "nothing"
 
 
-@app.route('/backtest_progress')
+@application.route('/backtest_progress')
 def backtest_progress():
     """
     backtest progress
@@ -437,19 +448,16 @@ def backtest_progress():
             progress = {0: min(100 * day_x // n_days_back, 100)}
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
-            current_strategy = s_module.Strategy()
-            day_x_position, day_x_price = current_strategy.get_position(), current_strategy.get_price()
-            trades.append({'position': day_x_position, 'price': day_x_price})
-            total_value_x = 0 if day_x == 0 else compute_pnl(trades[0]['position'],
-                                                             trades[1]['price'], trades[0]['price'],
-                                                             current_strategy.INIT_CAPITAL)
-
+            day_x_position = s_module.Strategy().get_position()
+            day_x = past_n_days[day_x]
+            total_value_x = compute_pnl(day_x, day_x_position)
+            position_df['value'].append(total_value_x)
             pnl_df['pnl'].append(total_value_x)
 
         yield f"data:{json.dumps({0: 100})}\n\n"
         pnl_df['date'] = past_n_days
         key = persist_to_s3(pnl_df, current_usr, strategy_id)
-        update_backtest_db(strategy_id, app.config["S3_BUCKET"], key)
+        update_backtest_db(strategy_id, application.config["S3_BUCKET"], key)
     return flask.Response(backtest(), mimetype='text/event-stream')
 
 
@@ -466,7 +474,7 @@ def persist_to_s3(pnl_df, current_usr, strategy_id):
     pnl_df.to_csv(file_name, index=True)
     key = f"{current_usr}/backtest_{strategy_id}.csv"
     _s3_client = s3_util.init_s3_client()
-    _s3_client.upload_file(file_name, app.config["S3_BUCKET"], key)
+    _s3_client.upload_file(file_name, application.config["S3_BUCKET"], key)
     return key
 
 
@@ -512,7 +520,7 @@ def compute_pnl(previous_day_position, prev_day_price, current_day_price, init_c
     return pnl
 
 
-@app.route('/results')
+@application.route('/results')
 @login_required
 def display_results():
     """display all the backtest results with selection option
@@ -525,11 +533,11 @@ def display_results():
     return render_template("results.html", df=user_backests)
 
 
-@app.route('/plots', methods=['POST'])
+@application.route('/plots', methods=['POST'])
 # @login_required
 def run_dash():
     """
-    Run dash app first in this function
+    Run dash application first in this function
         and then open then dash url in the new window.
         It will go back to /results for other selections.
     :return: redirect to /results
@@ -562,7 +570,7 @@ def run_dash():
     return redirect('/results')
 
 
-@app.route("/reset_password", methods=['GET', 'POST'])
+@application.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
     """
     send reset passwrod request
@@ -579,7 +587,7 @@ def reset_request():
     return render_template('reset_request.html', title='Reset Password', form=form)
 
 
-@app.route("/reset_password/<token>", methods=['GET', 'POST'])
+@application.route("/reset_password/<token>", methods=['GET', 'POST'])
 def reset_token(token):
     """
     reset secret token
@@ -607,6 +615,10 @@ def send_reset_email(user):
     send reset password request to the registered email
     :param user:
     :return:
+    
+    
+    
+    
     """
     token = user.get_reset_token()
     msg = Message('Password Reset Request',
@@ -653,7 +665,7 @@ def save_picture(form_picture):
     random_hex = secrets.token_hex(8)
     _, f_ext = os.path.splitext(form_picture.filename)
     picture_fn = random_hex + f_ext
-    picture_path = os.path.join(app.root_path, 'static/profile_pics',
+    picture_path = os.path.join(application.root_path, 'static/profile_pics',
                                 picture_fn)
     output_size = (125, 125)
     i = Image.open(form_picture)
@@ -704,7 +716,7 @@ def allowed_file(filename):
         [bool]: yes for allowed, no for not allowed
     """
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in app.config[
+           filename.rsplit('.', 1)[1].lower() in application.config[
                "ALLOWED_EXTENSIONS"]
 
 
@@ -801,7 +813,7 @@ def upload_strategy_to_s3(
         logger("Something Happened: %s", exp_msg)
         return e
 
-    return "{}{}".format(app.config["S3_LOCATION"], upload_path)
+    return "{}{}".format(application.config["S3_LOCATION"], upload_path)
 
 
 def delete_strategy_by_user(filepath):
@@ -815,7 +827,7 @@ def delete_strategy_by_user(filepath):
     NOTE: Need to delete both s3 and database
     """
     conn = rds.get_connection()
-    bucket_name = app.config["S3_BUCKET"]
+    bucket_name = application.config["S3_BUCKET"]
     split_path = filepath.split('/')
     prefix = "/".join(split_path[3:])
 
@@ -983,7 +995,7 @@ class User(db.Model, UserMixin):
         :param expires_sec: set the token expire period to 1800 seconds
         :return:
         """
-        s = Serializer(app.config['SECRET_KEY'], expires_sec)
+        s = Serializer(application.config['SECRET_KEY'], expires_sec)
         return s.dumps({'user_id': self.id}).decode('utf-8')
 
     @staticmethod
@@ -993,7 +1005,7 @@ class User(db.Model, UserMixin):
         :param token: secret token
         :return:
         """
-        s = Serializer(app.config['SECRET_KEY'])
+        s = Serializer(application.config['SECRET_KEY'])
         try:
             user_id = s.loads(token)['user_id']
         except:
@@ -1007,13 +1019,6 @@ class User(db.Model, UserMixin):
         return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
-def main():
-    """
-    run app
-    :return: None
-    """
-    app.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
-
-
 if __name__ == "__main__":
-    main()
+    application.debug = True
+    application.run(debug=False, threaded=True, host='0.0.0.0', port='5000')

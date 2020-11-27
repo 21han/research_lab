@@ -1,0 +1,15 @@
+************* Module current_strategy
+sample_strategies/current_strategy.py:10:0: R0903: Too few public methods (1/2) (too-few-public-methods)
+************* Module utils.s3_util
+utils/s3_util.py:1:0: R0801: Similar lines in 2 files
+==current_strategy:20
+==utils.mock_historical_data:14
+        'ETH',
+        'BNB',
+        'EOS',
+        'USDT',
+        'ATOM' (duplicate-code)
+
+------------------------------------------------------------------
+Your code has been rated at 9.78/10 (previous run: 9.78/10, +0.00)
+
