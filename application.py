@@ -2,6 +2,7 @@
 application.py
 """
 
+import collections
 import datetime
 import importlib
 import json
@@ -12,10 +13,11 @@ import shutil
 import subprocess
 import threading
 import time
-import collections
 import webbrowser
+
 import flask
 import pandas as pd
+import requests
 from PIL import Image
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
@@ -28,24 +30,17 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
-from pylint.lint import Run
+from oauthlib.oauth2 import WebApplicationClient
 from pylint import epylint as lint
+from pylint.lint import Run
 from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-from utils import s3_util, rds
-import threading
-import subprocess
-import webbrowser
+
 from errors.handlers import errors
-from utils import mock_historical_data
-
-
-
-from oauthlib.oauth2 import WebApplicationClient
-import requests
 from user import OAuthUser
+from utils import s3_util, rds
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -67,41 +62,29 @@ login_manager.login_message_category = 'info'
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
-
-
 # subprocess
 pro = None
 
 mail = Mail(application)
-# application.register_blueprint(errors)
-
+application.register_blueprint(errors)
 
 client = WebApplicationClient(application.config["GOOGLE_CLIENT_ID"])
 
 
 def get_google_provider_cfg():
+    """
+    get google provider config
+    :return:
+    """
     return requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
 
 
-# @application.route("/")
-# def index():
-#     if current_user.is_authenticated:
-#         return (
-#             "<p>Hey there! You're logged in!</p>"
-#             "<p>Username: {}"
-#             "<p>Email: {}</p>"
-#             "<div><p>Google Profile Picture:</p>"
-#             '<img src="{}" alt="Google profile pic"></img></div>'
-#             '<a class="button" href="/logout">Logout</a>'.format(
-#                 current_user.username, current_user.email, current_user.image_file
-#             )
-#         )
-#     else:
-#         return '<a class="button" href="/login">Google Login</a>'
-
-
 @application.route("/OAuth_login")
-def Ologin():
+def oauth_login():
+    """
+    OAuth login route
+    :return:
+    """
     google_provider_cfg = get_google_provider_cfg()
     authorization_endpoint = google_provider_cfg["authorization_endpoint"]
     request_uri = client.prepare_request_uri(
@@ -114,6 +97,10 @@ def Ologin():
 
 @application.route("/OAuth_login/callback")
 def callback():
+    """
+    OAuth login callback function from google auth page
+    :return:
+    """
     code = request.args.get("code")
     google_provider_cfg = get_google_provider_cfg()
     token_endpoint = google_provider_cfg["token_endpoint"]
@@ -155,30 +142,41 @@ def callback():
 
 @login_manager.user_loader
 def load_user(user_id):
+    """
+    load user from OAuth user table if id is found otherwise load user from user table
+    :param user_id:
+    :return:
+    """
     if not OAuthUser.get(user_id):
         return User.query.get(int(user_id))
     return OAuthUser.get(user_id)
 
 
-# @application.route("/home")
-# @login_required
-# def home():
-#     """
-#     home page after user login
-#
-#     :return: redirect user to upload page
-#     """
-#     if current_user.is_authenticated:
-#         conn = rds.get_connection()
-#         userid = pd.read_sql(
-#             f"select id from backtest.user where email = '{current_user.email}';",
-#             conn
-#         )
-#         current_user.id = int(userid['id'].iloc[0])
-#         return redirect('upload')
-#     return render_template('welcome.html', title='About')
+@application.route("/home")
+@login_required
+def home():
+    """
+    home page after user login
 
-
+    :return: redirect user to upload page
+    """
+    if current_user.is_authenticated:
+        conn = rds.get_connection()
+        if isinstance(current_user.email, str):
+            userid = pd.read_sql(
+                f"select id from backtest.user where email = '{current_user.email}';",
+                conn
+            )
+            current_user.id = int(userid['id'].iloc[0])
+        else:
+            current_user.email = str(current_user.email['email'].iloc[0])
+            userid = pd.read_sql(
+                f"select id from backtest.OAuth_user where email = '{current_user.email}';",
+                conn
+            )
+            current_user.id = int(userid['id'].iloc[0])
+        return redirect('upload')
+    return render_template('welcome.html', title='About')
 
 
 @application.route("/")
@@ -192,18 +190,17 @@ def about():
     return render_template('welcome.html', title='About')
 
 
-@application.route("/home")
-@login_required
-def home():
-    """
-    home page after user login
-
-    :return: redirect user to upload page
-    """
-    if current_user.is_authenticated:
-        return redirect('upload')
-    return render_template('welcome.html', title='About')
-
+# @application.route("/home")
+# @login_required
+# def home():
+#     """
+#     home page after user login
+#
+#     :return: redirect user to upload page
+#     """
+#     if current_user.is_authenticated:
+#         return redirect('upload')
+#     return render_template('welcome.html', title='About')
 
 
 @application.route("/login", methods=['GET', 'POST'])
@@ -236,8 +233,14 @@ def login():
     return render_template('login.html', title='Login', form=form)
 
 
-
-
+@application.route("/logout")
+def logout():
+    """
+    logout current user
+    :return:
+    """
+    logout_user()
+    return redirect(url_for('about'))
 
 
 @application.route("/upload")
@@ -268,7 +271,7 @@ def upload_strategy():
         return "Strategy name may not be empty"
     file = request.files["user_file"]
     name = request.form["strategy_name"]
-    
+
     message = check_upload_file(file)
     if message != "OK":
         return message
@@ -277,7 +280,7 @@ def upload_strategy():
     bucket_name = application.config["S3_BUCKET"]
 
     # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
-    
+
     conn = rds.get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -287,21 +290,21 @@ def upload_strategy():
         cnt_loc = id['m']
         break
 
-    logger.info("max + 1 is - %s", cnt_loc+1)
-    new_folder = "strategy" + str(cnt_loc+1)
+    logger.info("max + 1 is - %s", cnt_loc + 1)
+    new_folder = "strategy" + str(cnt_loc + 1)
 
     userid = str(current_user.id)
     response = check_py_validity(file, userid, new_folder)
 
     if '/' not in response:
         return response
-    
+
     local_path = response
     # Run pylint again to get the message
     # to pylint_stdout, which is an IO.byte
     (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
     pylint_message = pylint_stdout.read()
-    
+
     strategy_folder = os.path.join(userid, new_folder)
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(
@@ -324,7 +327,7 @@ def upload_strategy():
     )
 
     conn.commit()
-    
+
     local_folder = os.path.join('strategies/', userid)
     local_strategy_folder = os.path.join(local_folder, new_folder)
     shutil.rmtree(local_strategy_folder)
@@ -333,15 +336,11 @@ def upload_strategy():
     message = "Your strategy " + name + \
               " is uploaded successfully under " + \
               "/".join(filepath.split('/')[-2:]) + " path"
-              
+
     context = {"username": current_user.username,
                "report": pylint_message,
                "message": message}
     return render_template('upload.html', **context)
-
-
-
-
 
 
 @application.route("/register", methods=['GET', 'POST'])
@@ -374,7 +373,6 @@ def admin():
         function: render admin.html page
     """
     return render_template('admin.html')
-
 
 
 @application.route("/account", methods=['GET', 'POST'])
@@ -413,7 +411,19 @@ def all_strategy():
     Returns:
         function: render strategies.html page
     """
-
+    if not isinstance(current_user.id, int):
+        conn = rds.get_connection()
+        current_user.email = str(current_user.email['email'].iloc[0])
+        userid = pd.read_sql(
+            f"select id from backtest.OAuth_user where email = '{current_user.email}';",
+            conn
+        )
+        current_user.id = int(userid['id'].iloc[0])
+        user_name = pd.read_sql(
+            f"select username from backtest.OAuth_user where email = '{current_user.email}';",
+            conn
+        )
+        current_user.username = str(user_name['username'].iloc[0])
     current_user_id = current_user.id
     username = current_user.username
     all_user_strategies = get_user_strategies(current_user_id)
@@ -528,10 +538,13 @@ def backtest_progress():
     past_n_days = sorted(past_n_days)
 
     def backtest():
+        """
+        to backtest by iterating through each day
+        :return:
+        """
         pnl_df = {
             'pnl': []
         }
-        """ to backtest by iterating through each day"""
         trades = collections.deque(maxlen=2)  # note: we only keep track of today and last day
         for day_x in trange(n_days_back):
             one_tenth = n_days_back // 10
@@ -550,6 +563,7 @@ def backtest_progress():
         pnl_df['date'] = past_n_days
         key = persist_to_s3(pnl_df, current_usr, strategy_id)
         update_backtest_db(strategy_id, application.config["S3_BUCKET"], key)
+
     return flask.Response(backtest(), mimetype='text/event-stream')
 
 
@@ -625,7 +639,6 @@ def display_results():
     return render_template("results.html", df=user_backests)
 
 
-
 @application.route('/plots', methods=['POST'])
 # @login_required
 def run_dash():
@@ -661,8 +674,6 @@ def run_dash():
     t.join()
 
     return redirect('/results')
-
-
 
 
 @application.route("/reset_password", methods=['GET', 'POST'])
@@ -800,7 +811,6 @@ def get_strategy_location(strategy_id):
 
 def allowed_file(filename):
     """allowed file extension
-
     Args:
         filename ([string]): the file name including the extension
 
@@ -821,7 +831,6 @@ def check_upload_file(file):
     file.mimetype
     Args:
         file ([request]): in flask.request["file"], io.byte type
-  
     """
     if file.filename == "":
         return "Please select a file"
@@ -830,14 +839,13 @@ def check_upload_file(file):
         return "Your file extension type is not allowed"
 
     if not file:
-        return "File not found. Please upload it again"    
+        return "File not found. Please upload it again"
 
     return "OK"
 
 
 def check_py_validity(file, userid, new_folder):
     """run pylint on file to check if correct
-
     Args:
         file (str): flask file
         userid(int)
@@ -847,17 +855,15 @@ def check_py_validity(file, userid, new_folder):
     local_folder = os.path.join('strategies/', userid)
     if not os.path.exists(local_folder):
         os.makedirs(local_folder)
-
     local_strategy_folder = os.path.join(local_folder, new_folder)
     os.makedirs(local_strategy_folder)
     local_path = os.path.join(local_strategy_folder, file.filename)
     logger.info(f"local testing path is {local_path}")
     file.save(local_path)
     result = Run([local_path], do_exit=False)
-
     # may be need threshold
     logger.info(result.linter.stats)
-    
+
     if "global_note" not in result.linter.stats or \
             result.linter.stats['global_note'] <= 0:
         logger.info("wrong file, remove")
@@ -866,9 +872,10 @@ def check_py_validity(file, userid, new_folder):
         return "Your strategy has error or is not able to run! \
             correct your file and upload again"
 
-    logger.info("testing file has pylint score %s", 
+    logger.info("testing file has pylint score %s",
                 result.linter.stats['global_note'])
     return local_path
+
 
 def upload_strategy_to_s3(
         file, bucket_name, file_prefix):
@@ -1043,17 +1050,28 @@ class UpdateAccountForm(FlaskForm):
 
 
 class RequestResetForm(FlaskForm):
+    """
+    Request reset form
+    """
     email = StringField('Email',
                         validators=[DataRequired(), Email()])
     submit = SubmitField('Request Password Reset')
 
     def validate_email(self, email):
+        """
+
+        :param email:
+        :return:
+        """
         user = User.query.filter_by(email=email.data).first()
         if user is None:
             raise ValidationError('There is no account with that email. You must register first.')
 
 
 class ResetPasswordForm(FlaskForm):
+    """
+    Reset Password form
+    """
     password = PasswordField('Password', validators=[DataRequired()])
     confirm_password = PasswordField('Confirm Password',
                                      validators=[DataRequired(), EqualTo('password')])
@@ -1084,12 +1102,11 @@ class User(db.Model, UserMixin):
 
     def get_reset_token(self, expires_sec=1800):
         """ get a reset token (expire in 1800 seconds)
-
         :param expires_sec: set the token expire period to 1800 seconds
         :return:
         """
-        s = Serializer(application.config['SECRET_KEY'], expires_sec)
-        return s.dumps({'user_id': self.id}).decode('utf-8')
+        serialized = Serializer(application.config['SECRET_KEY'], expires_sec)
+        return serialized.dumps({'user_id': self.id}).decode('utf-8')
 
     @staticmethod
     def verify_reset_token(token):
@@ -1098,9 +1115,9 @@ class User(db.Model, UserMixin):
         :param token: secret token
         :return:
         """
-        s = Serializer(application.config['SECRET_KEY'])
+        serialized = Serializer(application.config['SECRET_KEY'])
         try:
-            user_id = s.loads(token)['user_id']
+            user_id = serialized.loads(token)['user_id']
         except:
             return None
         return User.query.get(user_id)
@@ -1112,7 +1129,6 @@ class User(db.Model, UserMixin):
         return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
-
 if __name__ == "__main__":
-    application.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
-    #application.run(debug=False, threaded=True, ssl_context="adhoc", port='5000')
+    # application.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
+    application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
