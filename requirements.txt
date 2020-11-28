@@ -57,3 +57,5 @@ urllib3==1.26.2
 Werkzeug==1.0.1
 wrapt==1.12.1
 WTForms==2.3.3
+requests==2.25.0
+oauthlib==3.1.0
