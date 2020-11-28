@@ -11,8 +11,11 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from dash import Dash
+import plotly.graph_objects as go
+from dash.dependencies import Input, Output, State
 from utils import s3_util, rds
 from config import S3_BUCKET
+import base64
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
@@ -30,7 +33,6 @@ def fig_update(file_path):
     :param file_path: string, to get csv file.
     :return: fig, the styled graph.
     """
-    graph_data = []
 
     split_path = file_path.split('/')
     prefix = "/".join(split_path[3:])
@@ -38,14 +40,10 @@ def fig_update(file_path):
     csv_obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=prefix)
     pnl_df = pd.read_csv(csv_obj['Body'])
 
-    # pnl_df.rename(columns={'Unnamed: 0': 'date', 'value': 'pnl'}, inplace=True)
-
-    # pnl_df = pd.read_csv(file_path)
     pnl_df['cusum'] = pnl_df['pnl'].cumsum()
-    graph_data.append({'x': pnl_df['date'], 'y': pnl_df['cusum']})
-    fig = px.line(pnl_df, x='date', y='cusum')
+    cr_fig = px.line(pnl_df, x='date', y='cusum')
 
-    fig.update_xaxes(
+    cr_fig.update_xaxes(
         rangeslider_visible=True,
         rangeselector=dict(
             buttons=list([
@@ -58,13 +56,51 @@ def fig_update(file_path):
         )
     )
 
-    return fig, pnl_df
+    # Rolling sharpe ratio plot
+    pnl_df['rolling_SR'] = pnl_df.pnl.rolling(180).apply(lambda x: (x.mean() - 0.02) / x.std(), raw=True)
+
+    pnl_df.fillna(0, inplace=True)
+    sr_df = pnl_df[pnl_df['rolling_SR'] > 0]
+    sr_rolling = go.Figure([go.Scatter(x=sr_df['date'], y=sr_df['rolling_SR'],
+                                       line=dict(color="DarkOrange"), mode='lines+markers')])
+    sr_rolling.update_xaxes(
+        rangeslider_visible=True,
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="YTD", step="year", stepmode="todate"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all")
+            ])
+        )
+    )
+    mean = np.mean(sr_df['rolling_SR'])
+    avg_title = "Average value={:.3f}".format(mean)
+    sr_rolling.add_hline(y=mean, line_width=3, line_dash="dash", line_color="green",
+                         annotation_text=avg_title,
+                         annotation_position="bottom right")
+
+    # pnl histogram plot
+    pnl_hist = go.Figure()
+    profit = pnl_df[pnl_df['pnl'] > 0]
+    loss = pnl_df[pnl_df['pnl'] < 0]
+
+    pnl_hist.add_trace(go.Bar(x=profit['date'], y=loss['pnl'],
+                         marker_color='crimson',
+                         name='loss'))
+    pnl_hist.add_trace(go.Bar(x=loss['date'], y=profit['pnl'],
+                         marker_color='lightslategrey',
+                         name='profit'
+                         ))
+
+    return cr_fig, sr_rolling, pnl_hist, pnl_df
 
 
 def make_table(data):
     """
     Given the file path, return an updated table to display.
-    :param table_path: string, to get csv file.
+    :param data: string, to get csv file.
     :return: html.Div, the component in Dash containing table.
     """
     return html.Div(
@@ -126,16 +162,23 @@ def construct_plot(strategy_names, pnl_paths):
         "padding": "2rem 1rem",
     }
 
+    tabs_styles = {
+        'height': '55px',
+        'font-size': '150%',
+        'fontWeight': 'bold'
+    }
+
     contents = []
     for str_key, str_name in strategy_names.items():
-        pnl_fig, pnl_df = fig_update(pnl_paths[str_key])
+        pnl_fig, sr_rolling, pnl_hist, pnl_df = fig_update(pnl_paths[str_key])
         table_df = pnl_summary(pnl_df)
 
         contents.append(
             dcc.Tab(label=str_name, children=[
+
                 html.Div(
                     [
-                        html.H1('Cumulative Plot',
+                        html.H1('Cumulative Return',
                                 style={'textAlign': 'center'}),
                         html.Hr(),
                         dbc.Row(
@@ -149,6 +192,35 @@ def construct_plot(strategy_names, pnl_paths):
                 ),
                 html.Div(
                     [
+                        html.H1('Rolling Sharpe Ratio (6-months)',
+                                style={'textAlign': 'center'}),
+                        html.Hr(),
+                        dbc.Row(
+                            [
+                                dbc.Col(dcc.Graph(figure=sr_rolling),
+                                        width={"size": 8, "offset": 2}),
+                            ]
+                        )
+                    ],
+                    style=content_style
+                ),
+                html.Div(
+                    [
+                        html.H1('Profit and Loss histogram',
+                                style={'textAlign': 'center'}),
+                        html.Hr(),
+                        dbc.Row(
+                            [
+                                dbc.Col(dcc.Graph(figure=pnl_hist),
+                                        width={"size": 8, "offset": 2}),
+                            ]
+                        )
+                    ],
+                    style=content_style
+                ),
+
+                html.Div(
+                    [
                         html.H1('Statistic Table',
                                 style={'font_size': '80',
                                        'text_align': 'center'}),
@@ -157,6 +229,7 @@ def construct_plot(strategy_names, pnl_paths):
                             data=table_df.to_dict('records'),
                             columns=[{'id': c, 'name': c} for c in table_df.columns],
 
+                            style_cell={'front_size': '16px'},
                             style_cell_conditional=[
                                 {
                                     'if': {'column_id': 'Backtest'},
@@ -166,7 +239,7 @@ def construct_plot(strategy_names, pnl_paths):
                                 {
                                     'if': {'column_id': 'Category'},
                                     'textAlign': 'left'
-                                }
+                                },
 
                             ],
                             style_data_conditional=[
@@ -183,15 +256,36 @@ def construct_plot(strategy_names, pnl_paths):
                                 'backgroundColor': 'rgb(230, 230, 230)',
                                 'fontWeight': 'bold'
                             }
-                        )
+                        ),
+                        dcc.Loading(html.A(
+                            id="img-download",
+                            href="",
+                            children=[html.Button("Download Image", id="download-btn")],
+                            target="_blank",
+                            download="my-figure.pdf"
+                        )),
                     ],
                     style=table_style
                 )
-
-            ])
+            ]
+            )
         )
 
-    return html.Div([dcc.Tabs(contents)])
+    return html.Div([dcc.Tabs(contents, style=tabs_styles)])
+
+
+@dash_app.callback(Output('img-download', 'href'),
+              [Input('graph', 'figure')])
+def make_image(figure):
+    """ Make a picture """
+
+    fmt = "pdf"
+    mimetype = "application/pdf"
+
+    data = base64.b64encode(to_image(figure, format=fmt)).decode("utf-8")
+    pdf_string = f"data:{mimetype};base64,{data}"
+
+    return pdf_string
 
 
 def get_plot(strategy_ids):
@@ -269,8 +363,8 @@ def call_dash(*args):
     :return:
     """
     ids = [str(item) for item in args[0][1:]]
+    print(ids)
     get_plot(ids)
-
     dash_app.run_server(host='127.0.0.1', port=8050, debug=False, threaded=True)
 
 
