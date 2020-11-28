@@ -51,7 +51,7 @@ from app import app
 class TestBase(unittest.TestCase):
     def setUp(self):
         """
-        start app test client, and login to linxiaow 
+        start application test client, and login to linxiaow 
         This function runs once before each member function unit test.
         """
         app.config['TESTING'] = True
