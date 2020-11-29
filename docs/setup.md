@@ -1,35 +1,13 @@
-# Prerequisite
+# Setup
 
-Download conda environment
+## changelog
 
-# Install conda environment
+(2020-11-29) changed from `conda` to `pip`.
 
-```sh
-conda env create -f env.yml
-```
+## Steps
 
-This will create a conda enviroment called ResearchLab. Check your conda enviroment list
-
-```sh
-conda env list
-```
-
-activate the conda environment
-```sh
-conda activate ResearchLab 
-```
-
-# Run the app
-
-navigate to project folder
-
-```sh
-./start.sh
-```
-
-# update conda environment
-
-```sh
-conda env update --file env.yml
-```
-
+1. make sure you have read this [post](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create-deploy-python-flask.html)
+2. use `virtualenv` to create an environment for `research_lab` project.
+3. use `pip install -r requirements.txt` to install package inside the new environment.
+4. for updating environment, please use `pip freeze > requirement.txt` and verify if the change makes sense by running `git diff`.
+ 
