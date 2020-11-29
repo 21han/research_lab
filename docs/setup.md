@@ -10,4 +10,3 @@
 2. use `virtualenv` to create an environment for `research_lab` project.
 3. use `pip install -r requirements.txt` to install package inside the new environment.
 4. for updating environment, please use `pip freeze > requirement.txt` and verify if the change makes sense by running `git diff`.
- 
