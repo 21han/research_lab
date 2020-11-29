@@ -42,6 +42,10 @@ from errors.handlers import errors
 from user import OAuthUser
 from utils import s3_util, rds
 
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
+from flask_migrate import Migrate
+
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 
@@ -65,18 +69,21 @@ s3_client = s3_util.init_s3_client()
 # subprocess
 pro = None
 
+# email for send reset password token
 mail = Mail(application)
+
+# error handler
 application.register_blueprint(errors)
 
+# Google OAuth login client
 client = WebApplicationClient(application.config["GOOGLE_CLIENT_ID"])
 
+# admin
+admin = Admin(application)
 
-def get_google_provider_cfg():
-    """
-    get google provider config
-    :return:
-    """
-    return requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
+migrate = Migrate(application, db)
+
+# endpoint routes
 
 
 @application.route("/OAuth_login")
@@ -93,6 +100,14 @@ def oauth_login():
         scope=["openid", "email", "profile"]
     )
     return redirect(request_uri)
+
+
+def get_google_provider_cfg():
+    """
+    get google provider config
+    :return:
+    """
+    return requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
 
 
 @application.route("/OAuth_login/callback")
@@ -137,9 +152,6 @@ def callback():
     return redirect(url_for("home"))
 
 
-# endpoint routes
-
-
 @login_manager.user_loader
 def load_user(user_id):
     """
@@ -162,6 +174,13 @@ def home():
     """
     if current_user.is_authenticated:
         conn = rds.get_connection()
+
+        good = pd.read_sql(
+            f"select is_approved from backtest.user where email = '{current_user.email}';",
+            conn
+        )
+        print("========", str(good['is_approved'].iloc[0]))
+
         if isinstance(current_user.email, str):
             userid = pd.read_sql(
                 f"select id from backtest.user where email = '{current_user.email}';",
@@ -190,19 +209,6 @@ def about():
     return render_template('welcome.html', title='About')
 
 
-# @application.route("/home")
-# @login_required
-# def home():
-#     """
-#     home page after user login
-#
-#     :return: redirect user to upload page
-#     """
-#     if current_user.is_authenticated:
-#         return redirect('upload')
-#     return render_template('welcome.html', title='About')
-
-
 @application.route("/login", methods=['GET', 'POST'])
 def login():
     """authenticate current user to access the platform with valid email and
@@ -218,7 +224,7 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password,
-                                               form.password.data):
+                                               form.password.data) and user.is_approved == "Yes":
             login_user(user, remember=form.remember.data)
             current_user.email = form.email.data
             next_page = request.args.get('next')
@@ -227,7 +233,7 @@ def login():
             else:
                 return redirect(url_for('home'))
         else:
-            flash('Login Unsuccessful. Please check email and password',
+            flash('Login Unsuccessful. Please check email and password contact admin for approval',
                   'danger')
     logger.info("NOT AUTHENTICATED")
     return render_template('login.html', title='Login', form=form)
@@ -358,21 +364,21 @@ def register():
                     email=form.email.data, password=hashed_password)
         db.session.add(user)
         db.session.commit()
-        flash(f'Your account has been created! You are now able to log in',
+        flash(f'Your account has been created! An admin is reviewing your registration request, please check-in again in 24 hours',
               'success')
         return redirect(url_for('login'))
     return render_template(
         'register.html', title='Register', form=form)
 
 
-@application.route("/admin", methods=['GET', 'POST'])
-def admin():
-    """render admin user page
-
-    Returns:
-        function: render admin.html page
-    """
-    return render_template('admin.html')
+# @application.route("/admin", methods=['GET', 'POST'])
+# def admin():
+#     """render admin user page
+#
+#     Returns:
+#         function: render admin.html page
+#     """
+#     return render_template('admin.html')
 
 
 @application.route("/account", methods=['GET', 'POST'])
@@ -1100,6 +1106,10 @@ class User(db.Model, UserMixin):
         default='default.jpg')
     password = db.Column(db.String(60), nullable=False)
 
+    is_approved = db.Column(db.String(10), nullable=False, default='No')
+    user_type = db.Column(db.String(10), nullable=False, default='user')
+
+
     def get_reset_token(self, expires_sec=1800):
         """ get a reset token (expire in 1800 seconds)
         :param expires_sec: set the token expire period to 1800 seconds
@@ -1129,6 +1139,8 @@ class User(db.Model, UserMixin):
         return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
+admin.add_view(ModelView(User, db.session))
+
 if __name__ == "__main__":
-    # application.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
-    application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
+    application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
+    #application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
