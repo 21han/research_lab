@@ -42,7 +42,7 @@ from errors.handlers import errors
 from user import OAuthUser
 from utils import s3_util, rds
 
-from flask_admin import Admin, AdminIndexView, BaseView, expose
+from flask_admin import Admin, BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask_migrate import Migrate
 
@@ -1135,17 +1135,6 @@ class User(db.Model, UserMixin):
         return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
-class Google(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    image_file = db.Column(
-        db.String(20),
-        nullable=False,
-        default='default.jpg')
-    is_approved = db.Column(db.String(10), nullable=False, default='No')
-    user_type = db.Column(db.String(10), nullable=False, default='user')
-
 class UserModelView(ModelView):
     def is_accessible(self):
         return current_user.is_authenticated and current_user.user_type == "admin"
@@ -1154,7 +1143,23 @@ class UserModelView(ModelView):
         return redirect(url_for('login'))
 
 
-class OAuthUserView(ModelView):
+class OAuthUserView(BaseView):
+    @expose('/')
+    def index(self):
+        return self.render('errors/403.html')
+
+    def is_accessible(self):
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for('login'))
+
+
+class StrategiesView(BaseView):
+    @expose('/')
+    def index(self):
+        return self.render('errors/403.html')
+
     def is_accessible(self):
         return current_user.is_authenticated and current_user.user_type == "admin"
 
@@ -1169,11 +1174,11 @@ class HomePageView(BaseView):
 
 
 # admin
-admin = Admin(application)  # , index_view=MyAdminIndexView)
+admin = Admin(application)
 admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
 admin.add_view(UserModelView(User, db.session))
-# admin.add_view(OAuthUserView(name='OAuth User', endpoint='welcome'))
-admin.add_view(OAuthUserView(Google, db.session))
+admin.add_view(OAuthUserView(name='OAuth User'))
+admin.add_view(StrategiesView(name="Strategies"))
 
 if __name__ == "__main__":
     application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
