@@ -42,7 +42,7 @@ from errors.handlers import errors
 from user import OAuthUser
 from utils import s3_util, rds
 
-from flask_admin import Admin
+from flask_admin import Admin, AdminIndexView, BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask_migrate import Migrate
 
@@ -78,10 +78,8 @@ application.register_blueprint(errors)
 # Google OAuth login client
 client = WebApplicationClient(application.config["GOOGLE_CLIENT_ID"])
 
-# admin
-admin = Admin(application)
-
 migrate = Migrate(application, db)
+
 
 # endpoint routes
 
@@ -174,13 +172,6 @@ def home():
     """
     if current_user.is_authenticated:
         conn = rds.get_connection()
-
-        good = pd.read_sql(
-            f"select is_approved from backtest.user where email = '{current_user.email}';",
-            conn
-        )
-        print("========", str(good['is_approved'].iloc[0]))
-
         if isinstance(current_user.email, str):
             userid = pd.read_sql(
                 f"select id from backtest.user where email = '{current_user.email}';",
@@ -227,15 +218,19 @@ def login():
                                                form.password.data) and user.is_approved == "Yes":
             login_user(user, remember=form.remember.data)
             current_user.email = form.email.data
+            current_user.user_type = user.user_type
+            current_user.id = user.id
             next_page = request.args.get('next')
             if next_page:
                 return redirect(next_page)
             else:
-                return redirect(url_for('home'))
+                if user.user_type == "user":
+                    return redirect(url_for('home'))
+                elif user.user_type == "admin":
+                    return redirect(url_for('admin'))
         else:
-            flash('Login Unsuccessful. Please check email and password contact admin for approval',
+            flash('Login Unsuccessful. Please check email and password. Waiting for admin approval',
                   'danger')
-    logger.info("NOT AUTHENTICATED")
     return render_template('login.html', title='Login', form=form)
 
 
@@ -364,21 +359,23 @@ def register():
                     email=form.email.data, password=hashed_password)
         db.session.add(user)
         db.session.commit()
-        flash(f'Your account has been created! An admin is reviewing your registration request, please check-in again in 24 hours',
-              'success')
+        flash(
+            f'Your account has been created! An admin is reviewing your registration request, please check-in again in 24 hours',
+            'success')
         return redirect(url_for('login'))
     return render_template(
         'register.html', title='Register', form=form)
 
 
-# @application.route("/admin", methods=['GET', 'POST'])
-# def admin():
-#     """render admin user page
-#
-#     Returns:
-#         function: render admin.html page
-#     """
-#     return render_template('admin.html')
+@application.route("/admin", methods=['GET', 'POST'])
+@login_required
+def admin():
+    """render admin user page
+
+    Returns:
+        function: render falsk admin page
+    """
+    return redirect('/admin/')
 
 
 @application.route("/account", methods=['GET', 'POST'])
@@ -1109,7 +1106,6 @@ class User(db.Model, UserMixin):
     is_approved = db.Column(db.String(10), nullable=False, default='No')
     user_type = db.Column(db.String(10), nullable=False, default='user')
 
-
     def get_reset_token(self, expires_sec=1800):
         """ get a reset token (expire in 1800 seconds)
         :param expires_sec: set the token expire period to 1800 seconds
@@ -1139,8 +1135,46 @@ class User(db.Model, UserMixin):
         return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
-admin.add_view(ModelView(User, db.session))
+class Google(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(20), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    image_file = db.Column(
+        db.String(20),
+        nullable=False,
+        default='default.jpg')
+    is_approved = db.Column(db.String(10), nullable=False, default='No')
+    user_type = db.Column(db.String(10), nullable=False, default='user')
+
+class UserModelView(ModelView):
+    def is_accessible(self):
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for('login'))
+
+
+class OAuthUserView(ModelView):
+    def is_accessible(self):
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for('login'))
+
+
+class HomePageView(BaseView):
+    @expose('/')
+    def index(self):
+        return self.render('welcome.html')
+
+
+# admin
+admin = Admin(application)  # , index_view=MyAdminIndexView)
+admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
+admin.add_view(UserModelView(User, db.session))
+# admin.add_view(OAuthUserView(name='OAuth User', endpoint='welcome'))
+admin.add_view(OAuthUserView(Google, db.session))
 
 if __name__ == "__main__":
     application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
-    #application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
+    # application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
