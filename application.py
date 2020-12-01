@@ -229,7 +229,6 @@ def login():
         else:
             flash('Login Unsuccessful. Please check email and password',
                   'danger')
-    logger.info("NOT AUTHENTICATED")
     return render_template('login.html', title='Login', form=form)
 
 
@@ -264,7 +263,11 @@ def upload_strategy():
 
     Returns:
         string: return message of upload status with corresponding pylint score
+        
+    test_id = num -> it is for testing
+    need to avoid local and cloud storage difference
     """
+    
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
@@ -281,20 +284,24 @@ def upload_strategy():
 
     # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
 
+    # local has its own count
+    # and cloud has its own count
+    
     conn = rds.get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT MAX(strategy_id) as m FROM backtest.strategies"
-    )
-    for id in cursor.fetchall():
-        cnt_loc = id['m']
-        break
+    # cursor.execute(
+    #     "SELECT MAX(strategy_id) as m FROM backtest.strategies"
+    # )
+    # for id in cursor.fetchall():
+    #     cnt_loc = id['m']
+    #     break
 
-    logger.info("max + 1 is - %s", cnt_loc + 1)
-    new_folder = "strategy" + str(cnt_loc + 1)
-
+    # logger.info("max + 1 is - %s", cnt_loc + 1)
     userid = str(current_user.id)
-    response = check_py_validity(file, userid, new_folder)
+    # local_cnt = sum([1 for _ in os.listdir(path)])
+    # new_folder = "strategy" + str(local_cnt + 1)
+
+    response = check_py_validity(file, userid)
 
     if '/' not in response:
         return response
@@ -305,7 +312,24 @@ def upload_strategy():
     (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
     pylint_message = pylint_stdout.read()
 
-    strategy_folder = os.path.join(userid, new_folder)
+    test_id = request.args.get('test_id')
+    if test_id is not None:
+        test_id = int(test_id)
+        logger.info("uploading testing file...")
+        cnt_loc = test_id
+    else:
+        logger.info("uploading user file...")
+        cursor.execute(
+            "SELECT MAX(strategy_id) as m FROM backtest.strategies"
+        )
+        for id in cursor.fetchall():
+            cnt_loc = id['m']
+            break
+        cnt_loc += 1
+        logger.info("max + 1 is - %s", cnt_loc)
+    
+    cloud_new_folder = "strategy" + str(cnt_loc)
+    strategy_folder = os.path.join(userid, cloud_new_folder)
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(
         local_path, bucket_name, strategy_folder
@@ -316,11 +340,10 @@ def upload_strategy():
     # store in database
     cursor = conn.cursor()
     timestamp = str(datetime.datetime.now())
-
+    
     query = "INSERT INTO backtest.strategies (user_id, strategy_location, \
-            last_modified_date, last_modified_user, strategy_name) \
-                    VALUES (%s,%s,%s,%s,%s)"
-
+        last_modified_date, last_modified_user, strategy_name) \
+                VALUES (%s,%s,%s,%s,%s)"
     username = current_user.username
     cursor.execute(
         query, (current_user.id, filepath, timestamp, username, name)
@@ -328,9 +351,10 @@ def upload_strategy():
 
     conn.commit()
 
-    local_folder = os.path.join('strategies/', userid)
-    local_strategy_folder = os.path.join(local_folder, new_folder)
-    shutil.rmtree(local_strategy_folder)
+    local_prefix = '/'.join(local_path.split('/')[:-1])
+    # local_folder = os.path.join('strategies/', userid)
+    # local_strategy_folder = os.path.join(local_folder, new_folder)
+    shutil.rmtree(local_prefix)
 
     logger.info(f"affected rows = {cursor.rowcount}")
     message = "Your strategy " + name + \
@@ -844,8 +868,9 @@ def check_upload_file(file):
     return "OK"
 
 
-def check_py_validity(file, userid, new_folder):
+def check_py_validity(file, userid):
     """run pylint on file to check if correct
+    store file in local
     Args:
         file (str): flask file
         userid(int)
@@ -855,6 +880,9 @@ def check_py_validity(file, userid, new_folder):
     local_folder = os.path.join('strategies/', userid)
     if not os.path.exists(local_folder):
         os.makedirs(local_folder)
+    local_cnt = sum([1 for _ in os.listdir(local_folder)])
+    new_folder = "strategy" + str(local_cnt + 1)
+    
     local_strategy_folder = os.path.join(local_folder, new_folder)
     os.makedirs(local_strategy_folder)
     local_path = os.path.join(local_strategy_folder, file.filename)

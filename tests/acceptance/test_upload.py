@@ -4,8 +4,9 @@
 import io
 
 import pandas as pd
-
-from utils import rds
+from config import S3_BUCKET
+from random import randint
+from utils import rds, s3_util
 from .test_baseclass import TestBase
 
 
@@ -38,8 +39,25 @@ class TestUpload(TestBase):
         with open('tests/uploads/helpers.py', 'rb') as fh:
             buf = io.BytesIO(fh.read())
             data['user_file'] = (buf, 'helpers.py')
+        
+        s3 = s3_util.init_s3_client()
+        test_id = randint(-1000, -1)
+        
+        while True:
+            # 11 is testuser
+            s3_path = "s3://coms4156-strategies/11/strategy" + str(test_id)
+            response = s3.list_objects(
+                Bucket=S3_BUCKET,
+                Prefix=s3_path
+            )
+            if "Contents" not in response or \
+                    len(response["Contents"] == 0):
+                # not exist
+                break
+            test_id = randint(-1000, -1)
+            
         response = self.app.post(
-            "/upload",
+            "/upload?test_id="+str(test_id),
             data=data,
         )
 
@@ -48,13 +66,10 @@ class TestUpload(TestBase):
         self.assertIn(b"successfully", response.data,
                       "file upload is not shown as successful")
         
-        file_suffix = str(response.data).split(' ')[-2]
-        # 11 is testuser
-        s3_path = "s3://coms4156-strategies/11/" + file_suffix
-
+        s3_loc = "s3://coms4156-strategies/11/strategy" + str(test_id) + '/helpers.py'
         conn = rds.get_connection()
         strategies = pd.read_sql(
-            f"select * from backtest.strategies where strategy_location = '{s3_path}';",
+            f"select * from backtest.strategies where strategy_location='{s3_loc}';",
             conn
         )
         s_id = strategies['strategy_id'].iloc[0]
