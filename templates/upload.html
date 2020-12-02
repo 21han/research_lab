@@ -2,7 +2,7 @@
 {% block content %}
 <h1>Upload Your Files Here</h1>
 
-<form action="/upload" method="POST" enctype="multipart/form-data">
+<form name="post" action="/upload" method="POST" onsubmit="return modal_trigger()" enctype="multipart/form-data">
 
     <label for="user_file">Upload Your File. Note that your file should be a .py file</label>
     <br></br>
@@ -17,6 +17,32 @@
     <button type="submit">Upload</button>
 
 </form>
+
+<!-- Button trigger modal
+<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
+    Launch demo modal
+</button> -->
+
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Upload Not Successful!</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <!-- <button type="button" class="btn btn-primary">Save changes</button> -->
+        </div>
+      </div>
+    </div>
+</div>
 
 <!-- <div class="container small">
     {{message}}
@@ -40,8 +66,42 @@
 
 <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.2/css/bootstrap.min.css">
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.2/js/bootstrap.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+
+<script>
+    function modal_trigger(e){
+        var fname = document.forms["post"]["user_file"].value;
+        // did not select a file
+        if (fname === "") {
+            $("#exampleModal .modal-body").text('Please select a file!');
+            $('#exampleModal').modal("show");
+            return false;
+        }
+        var sname = document.forms["post"]["strategy_name"].value;
+
+        // did not give a name
+        if (sname === ""){
+            $("#exampleModal .modal-body").text('Strategy name cannot be empty');
+            $('#exampleModal').modal("show");
+            return false;
+        }
+
+        var arr = fname.split("\\"); // is this correct?
+        var file = arr[arr.length - 1];
+        console.log("file name is " + file);
+        var allowed_extenstion = ["py"];
+        var extension = file.split('.').pop();
+        if (!allowed_extenstion.includes(extension) || !file.includes('.')){
+            $("#exampleModal .modal-body").text('Your file extension type is not allowed');
+            $('#exampleModal').modal("show");
+            return false;
+        }
+        return true;
+    }
+    
+</script>
 
 {% endblock content %}
