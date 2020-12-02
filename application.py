@@ -1140,7 +1140,7 @@ class UserModelView(ModelView):
         return current_user.is_authenticated and current_user.user_type == "admin"
 
     def inaccessible_callback(self, name, **kwargs):
-        return redirect(url_for('login'))
+        return self.render('errors/403.html')
 
 
 class OAuthUserView(BaseView):
@@ -1172,13 +1172,19 @@ class HomePageView(BaseView):
     def index(self):
         return self.render('welcome.html')
 
+    def is_accessible(self):
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for('login'))
+
 
 # admin
 admin = Admin(application)
 admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
 admin.add_view(UserModelView(User, db.session))
-admin.add_view(OAuthUserView(name='OAuth User'))
-admin.add_view(StrategiesView(name="Strategies"))
+# admin.add_view(OAuthUserView(name='OAuth User'))
+# admin.add_view(StrategiesView(name="Strategies"))
 
 if __name__ == "__main__":
     application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
