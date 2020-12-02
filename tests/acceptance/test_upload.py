@@ -4,6 +4,7 @@
 import io
 
 import pandas as pd
+import time
 from config import S3_BUCKET
 from random import randint
 from utils import rds, s3_util
@@ -39,11 +40,14 @@ class TestUpload(TestBase):
         with open('tests/uploads/helpers.py', 'rb') as fh:
             buf = io.BytesIO(fh.read())
             data['user_file'] = (buf, 'helpers.py')
-        
+
         s3 = s3_util.init_s3_client()
         test_id = randint(-1000, -1)
-        
-        while True:
+
+        start = time.time()
+        created = False  # if the loop success
+        while time.time() - start < 60:
+            # 1 minutes in total
             # 11 is testuser
             s3_path = "s3://coms4156-strategies/11/strategy" + str(test_id)
             response = s3.list_objects(
@@ -52,10 +56,14 @@ class TestUpload(TestBase):
             )
             if "Contents" not in response or \
                     len(response["Contents"] == 0):
-                # not exist
+                # not exist, create
+                created = True
                 break
             test_id = randint(-1000, -1)
-            
+
+        if not created:
+            assert False, "there is no available spots to create test file"
+        
         response = self.app.post(
             "/upload?test_id="+str(test_id),
             data=data,

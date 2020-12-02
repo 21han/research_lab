@@ -266,6 +266,10 @@ def upload_strategy():
         
     test_id = num -> it is for testing
     need to avoid local and cloud storage difference
+    cloud path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
+
+    local has its own count
+    and cloud has its own count
     """
     
     if "user_file" not in request.files:
@@ -282,25 +286,7 @@ def upload_strategy():
     # get the number of folders
     bucket_name = application.config["S3_BUCKET"]
 
-    # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
-
-    # local has its own count
-    # and cloud has its own count
-    
-    conn = rds.get_connection()
-    cursor = conn.cursor()
-    # cursor.execute(
-    #     "SELECT MAX(strategy_id) as m FROM backtest.strategies"
-    # )
-    # for id in cursor.fetchall():
-    #     cnt_loc = id['m']
-    #     break
-
-    # logger.info("max + 1 is - %s", cnt_loc + 1)
     userid = str(current_user.id)
-    # local_cnt = sum([1 for _ in os.listdir(path)])
-    # new_folder = "strategy" + str(local_cnt + 1)
-
     response = check_py_validity(file, userid)
 
     if '/' not in response:
@@ -313,6 +299,9 @@ def upload_strategy():
     pylint_message = pylint_stdout.read()
 
     test_id = request.args.get('test_id')
+
+    conn = rds.get_connection()
+    cursor = conn.cursor()
     if test_id is not None:
         test_id = int(test_id)
         logger.info("uploading testing file...")
@@ -320,14 +309,13 @@ def upload_strategy():
     else:
         logger.info("uploading user file...")
         cursor.execute(
-            "SELECT MAX(strategy_id) as m FROM backtest.strategies"
+            "SELECT MAX(strategy_id) as max_strategy FROM backtest.strategies"
         )
-        for id in cursor.fetchall():
-            cnt_loc = id['m']
-            break
+        first = cursor.fetone()
+        cnt_loc = first['max_strategy']
         cnt_loc += 1
         logger.info("max + 1 is - %s", cnt_loc)
-    
+
     cloud_new_folder = "strategy" + str(cnt_loc)
     strategy_folder = os.path.join(userid, cloud_new_folder)
     # upload to s3 bucket
@@ -340,7 +328,7 @@ def upload_strategy():
     # store in database
     cursor = conn.cursor()
     timestamp = str(datetime.datetime.now())
-    
+
     query = "INSERT INTO backtest.strategies (user_id, strategy_location, \
         last_modified_date, last_modified_user, strategy_name) \
                 VALUES (%s,%s,%s,%s,%s)"
@@ -352,8 +340,8 @@ def upload_strategy():
     conn.commit()
 
     local_prefix = '/'.join(local_path.split('/')[:-1])
-    # local_folder = os.path.join('strategies/', userid)
-    # local_strategy_folder = os.path.join(local_folder, new_folder)
+
+    # remove the local file
     shutil.rmtree(local_prefix)
 
     logger.info(f"affected rows = {cursor.rowcount}")
