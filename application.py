@@ -1136,6 +1136,9 @@ class User(db.Model, UserMixin):
 
 
 class UserModelView(ModelView):
+    """
+    User view
+    """
     def is_accessible(self):
         return current_user.is_authenticated and current_user.user_type == "admin"
 
@@ -1144,6 +1147,9 @@ class UserModelView(ModelView):
 
 
 class OAuthUserView(BaseView):
+    """
+    OAuth User view
+    """
     @expose('/')
     def index(self):
         return self.render('errors/403.html')
@@ -1156,6 +1162,9 @@ class OAuthUserView(BaseView):
 
 
 class StrategiesView(BaseView):
+    """
+    Strategies view
+    """
     @expose('/')
     def index(self):
         return self.render('errors/403.html')
@@ -1168,6 +1177,9 @@ class StrategiesView(BaseView):
 
 
 class HomePageView(BaseView):
+    """
+    Home page view
+    """
     @expose('/')
     def index(self):
         return self.render('welcome.html')
@@ -1187,5 +1199,5 @@ admin.add_view(UserModelView(User, db.session))
 # admin.add_view(StrategiesView(name="Strategies"))
 
 if __name__ == "__main__":
-    application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
-    # application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
+    # application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
+    application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
