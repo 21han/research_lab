@@ -1140,9 +1140,19 @@ class UserModelView(ModelView):
     User view
     """
     def is_accessible(self):
+        """
+        check if user can access admin page
+        :return:
+        """
         return current_user.is_authenticated and current_user.user_type == "admin"
 
     def inaccessible_callback(self, name, **kwargs):
+        """
+        return 403 page if not access admin page
+        :param name:
+        :param kwargs:
+        :return:
+        """
         return self.render('errors/403.html')
 
 
@@ -1152,12 +1162,26 @@ class OAuthUserView(BaseView):
     """
     @expose('/')
     def index(self):
+        """
+        can't access this page
+        :return:
+        """
         return self.render('errors/403.html')
 
     def is_accessible(self):
+        """
+
+        :return:
+        """
         return current_user.is_authenticated and current_user.user_type == "admin"
 
     def inaccessible_callback(self, name, **kwargs):
+        """
+
+        :param name:
+        :param kwargs:
+        :return:
+        """
         return redirect(url_for('login'))
 
 
@@ -1167,12 +1191,26 @@ class StrategiesView(BaseView):
     """
     @expose('/')
     def index(self):
+        """
+
+        :return:
+        """
         return self.render('errors/403.html')
 
     def is_accessible(self):
+        """
+
+        :return:
+        """
         return current_user.is_authenticated and current_user.user_type == "admin"
 
     def inaccessible_callback(self, name, **kwargs):
+        """
+
+        :param name:
+        :param kwargs:
+        :return:
+        """
         return redirect(url_for('login'))
 
 
@@ -1182,12 +1220,26 @@ class HomePageView(BaseView):
     """
     @expose('/')
     def index(self):
+        """
+
+        :return:
+        """
         return self.render('welcome.html')
 
     def is_accessible(self):
+        """
+
+        :return:
+        """
         return current_user.is_authenticated and current_user.user_type == "admin"
 
     def inaccessible_callback(self, name, **kwargs):
+        """
+
+        :param name:
+        :param kwargs:
+        :return:
+        """
         return redirect(url_for('login'))
 
 
