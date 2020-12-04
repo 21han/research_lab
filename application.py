@@ -311,7 +311,7 @@ def upload_strategy():
         cursor.execute(
             "SELECT MAX(strategy_id) as max_strategy FROM backtest.strategies"
         )
-        first = cursor.fetone()
+        first = cursor.fetchone()
         cnt_loc = first['max_strategy']
         cnt_loc += 1
         logger.info("max + 1 is - %s", cnt_loc)
