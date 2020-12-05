@@ -1142,7 +1142,7 @@ class UserModelView(ModelView):
     def is_accessible(self):
         """
         check if user can access admin page
-        :return:
+        :return: admin user redirect to admin page
         """
         return current_user.is_authenticated and current_user.user_type == "admin"
 
@@ -1151,7 +1151,7 @@ class UserModelView(ModelView):
         return 403 page if not access admin page
         :param name:
         :param kwargs:
-        :return:
+        :return: 403 error page
         """
         return self.render('errors/403.html')
 
@@ -1251,5 +1251,5 @@ admin.add_view(UserModelView(User, db.session))
 # admin.add_view(StrategiesView(name="Strategies"))
 
 if __name__ == "__main__":
-    # application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
-    application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
+    application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
+    # application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
