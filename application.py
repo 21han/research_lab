@@ -10,15 +10,22 @@ import logging
 import os
 import secrets
 import shutil
-import subprocess
-import threading
 import time
-import webbrowser
 
+import dash_bootstrap_components as dbc
+import dash_core_components as dcc
+import dash_html_components as html
+import dash_table as dt
 import flask
+import numpy as np
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import requests
 from PIL import Image
+from dash import Dash
+from dash.dependencies import Input, Output
+from dash.exceptions import PreventUpdate
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
 from flask import request
@@ -37,6 +44,8 @@ from oauthlib.oauth2 import WebApplicationClient
 from pylint import epylint as lint
 from pylint.lint import Run
 from tqdm import trange
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from werkzeug.serving import run_simple
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
@@ -44,20 +53,6 @@ from wtforms.validators import DataRequired, Email, EqualTo, Length, \
 from errors.handlers import errors
 from user import OAuthUser
 from utils import s3_util, rds
-
-from dash import Dash
-import plotly.graph_objects as go
-from dash.dependencies import Input, Output, State
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
-import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-import dash_html_components as html
-import dash_table as dt
-import numpy as np
-import plotly.express as px
-from werkzeug.serving import run_simple
-from dash.exceptions import PreventUpdate
-
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -108,22 +103,15 @@ def oauth_login():
     OAuth login route
     :return:
     """
-    google_provider_cfg = get_google_provider_cfg()
+    google_provider_cfg = requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
     authorization_endpoint = google_provider_cfg["authorization_endpoint"]
     request_uri = client.prepare_request_uri(
         authorization_endpoint,
         redirect_uri=request.base_url + "/callback",
         scope=["openid", "email", "profile"]
     )
+    logger.info(request_uri)
     return redirect(request_uri)
-
-
-def get_google_provider_cfg():
-    """
-    get google provider config
-    :return:
-    """
-    return requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
 
 
 @application.route("/OAuth_login/callback")
@@ -133,7 +121,7 @@ def callback():
     :return:
     """
     code = request.args.get("code")
-    google_provider_cfg = get_google_provider_cfg()
+    google_provider_cfg = requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
     token_endpoint = google_provider_cfg["token_endpoint"]
     token_url, headers, body = client.prepare_token_request(
         token_endpoint,
