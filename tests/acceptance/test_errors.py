@@ -23,25 +23,7 @@ class TestError(TestBase):
         )
 
 
-    def test_error_403(self):
-        """
-        GET /admin/user
-        WHEN user go to a non exist end point /error directory
-        THEN 403 page should appear
-        """
-        response = self.app.post(
-            "/login",
-            data={
-                "email": "testuser@testuser.com",
-                "password": "testuser"},
-        )
 
-        response = self.app.get('/admin/user')
-        self.assertEqual(
-            response.status_code,
-            403,
-            "cannot catch 403 error"
-        )
 
 
 
