@@ -775,7 +775,7 @@ def output_reader(proc):
     :return: None
     """
     for line in iter(proc.stdout.readline, b''):
-        logger.info('got line: {0}'.format(line.decode('utf-8')), end='')
+        logger.info('got line: {0}'.format(line.decode('utf-8')))
 
 
 def get_user_backtests(user_id):
