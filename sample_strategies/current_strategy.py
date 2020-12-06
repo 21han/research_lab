@@ -4,7 +4,9 @@ description: trade randomly
 character: any better way to lose money?
 """
 
+import datetime
 import numpy as np
+from utils import mock_historical_data
 
 
 class Strategy:
@@ -21,13 +23,15 @@ class Strategy:
         'ETH',
         'BNB',
         'EOS',
-        'USDT',
-        'ATOM'
+        'ATOM',
+        'USDT'
     ]
 
+    INIT_CAPITAL = 10 ** 6
+
     @staticmethod
-    def run():
-        """"
+    def get_position():
+        """
         returns the portfolio distribution of trading universe in a given day
         """
         num_strategy = len(Strategy.trading_universe)
@@ -42,3 +46,15 @@ class Strategy:
                 Strategy.trading_universe[i]
             ] = allocation_ls[i]
         return allocation_map
+
+    @staticmethod
+    def get_price():
+        """
+        get price of symbols in the universe
+        :return:
+        """
+        mk_data = mock_historical_data.MockData
+        prices = {}
+        for ticker in Strategy.trading_universe:
+            prices[ticker]: mk_data.get_price(datetime.datetime.now(), ticker)
+        return prices
