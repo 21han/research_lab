@@ -33,7 +33,7 @@ def test_s3_resource_connection():
     assert s3_resource.Bucket(S3_BUCKET) in s3_resource.buckets.all()
 
 
-def test_s3_get_backtest_data():
+def test_get_backtest_data():
     """
     test get backtest date works for sample test data user_id = 0
     """
@@ -41,7 +41,7 @@ def test_s3_get_backtest_data():
     assert backtest_df.shape[0] != 0
 
 
-def test_s3_get_backtest_data_invalid_user():
+def test_get_backtest_data_invalid_user():
     """
     test get backtest date should not work for invalid user id (-1)
     """
@@ -49,7 +49,7 @@ def test_s3_get_backtest_data_invalid_user():
     assert backtest_df.shape[0] == 0
 
 
-def test_s3_get_all_colation():
+def test_get_all_colation():
     """
     test get location of backtest results works for valid test data user_id = 0
     """

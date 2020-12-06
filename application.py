@@ -761,15 +761,6 @@ If you did not make this request then simply ignore this email and no changes wi
 
 
 # helper functions
-def output_reader(proc):
-    """
-    Check if subprocess works correctly.
-    :param proc: process
-    :return: None
-    """
-    for line in iter(proc.stdout.readline, b''):
-        logger.info('got line: {0}'.format(line.decode('utf-8')))
-
 
 def get_user_backtests(user_id):
     """
