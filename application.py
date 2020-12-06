@@ -22,10 +22,13 @@ from PIL import Image
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
 from flask import request
+from flask_admin import Admin, BaseView, expose
+from flask_admin.contrib.sqla import ModelView
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, current_user, login_required, \
     login_user, logout_user
 from flask_mail import Message, Mail
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
@@ -62,18 +65,20 @@ login_manager.login_message_category = 'info'
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
+
+# email for send reset password token
 mail = Mail(application)
+
+# error handler
 application.register_blueprint(errors)
 
+# Google OAuth login client
 client = WebApplicationClient(application.config["GOOGLE_CLIENT_ID"])
 
+migrate = Migrate(application, db)
 
-def get_google_provider_cfg():
-    """
-    get google provider config
-    :return:
-    """
-    return requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
+
+# endpoint routes
 
 
 @application.route("/OAuth_login")
@@ -90,6 +95,14 @@ def oauth_login():
         scope=["openid", "email", "profile"]
     )
     return redirect(request_uri)
+
+
+def get_google_provider_cfg():
+    """
+    get google provider config
+    :return:
+    """
+    return requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
 
 
 @application.route("/OAuth_login/callback")
@@ -132,9 +145,6 @@ def callback():
         OAuthUser.create(unique_id, user_name, user_email, picture)
     login_user(user)
     return redirect(url_for("home"))
-
-
-# endpoint routes
 
 
 @login_manager.user_loader
@@ -187,19 +197,6 @@ def about():
     return render_template('welcome.html', title='About')
 
 
-# @application.route("/home")
-# @login_required
-# def home():
-#     """
-#     home page after user login
-#
-#     :return: redirect user to upload page
-#     """
-#     if current_user.is_authenticated:
-#         return redirect('upload')
-#     return render_template('welcome.html', title='About')
-
-
 @application.route("/login", methods=['GET', 'POST'])
 def login():
     """authenticate current user to access the platform with valid email and
@@ -215,16 +212,21 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password,
-                                               form.password.data):
+                                               form.password.data) and user.is_approved == "Yes":
             login_user(user, remember=form.remember.data)
             current_user.email = form.email.data
+            current_user.user_type = user.user_type
+            current_user.id = user.id
             next_page = request.args.get('next')
             if next_page:
                 return redirect(next_page)
             else:
-                return redirect(url_for('home'))
+                if user.user_type == "user":
+                    return redirect(url_for('home'))
+                elif user.user_type == "admin":
+                    return redirect(url_for('admin'))
         else:
-            flash('Login Unsuccessful. Please check email and password',
+            flash('Login Unsuccessful. Please check email and password. Waiting for admin approval',
                   'danger')
     return render_template('login.html', title='Login', form=form)
 
@@ -366,21 +368,23 @@ def register():
                     email=form.email.data, password=hashed_password)
         db.session.add(user)
         db.session.commit()
-        flash(f'Your account has been created! You are now able to log in',
-              'success')
+        flash(
+            f'Your account has been created! An admin is reviewing your registration request, please check-in again in 24 hours',
+            'success')
         return redirect(url_for('login'))
     return render_template(
         'register.html', title='Register', form=form)
 
 
 @application.route("/admin", methods=['GET', 'POST'])
+@login_required
 def admin():
     """render admin user page
 
     Returns:
-        function: render admin.html page
+        function: render falsk admin page
     """
-    return render_template('admin.html')
+    return redirect('/admin/')
 
 
 @application.route("/account", methods=['GET', 'POST'])
@@ -1112,6 +1116,9 @@ class User(db.Model, UserMixin):
         default='default.jpg')
     password = db.Column(db.String(60), nullable=False)
 
+    is_approved = db.Column(db.String(10), nullable=False, default='No')
+    user_type = db.Column(db.String(10), nullable=False, default='user')
+
     def get_reset_token(self, expires_sec=1800):
         """ get a reset token (expire in 1800 seconds)
         :param expires_sec: set the token expire period to 1800 seconds
@@ -1140,6 +1147,62 @@ class User(db.Model, UserMixin):
         :return: stirng contains userid, username, user email of user object
         """
         return f"User('{self.id}', '{self.username}', '{self.email}')"
+
+
+class UserModelView(ModelView):
+    """
+    User view
+    """
+    def is_accessible(self):
+        """
+        check if user can access admin page
+        :return: admin user redirect to admin page
+        """
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        """
+        return 403 page if not access admin page
+        :param name:
+        :param kwargs:
+        :return: 403 error page
+        """
+        return self.render('errors/403.html')
+
+
+class HomePageView(BaseView):
+    """
+    Home page view
+    """
+    @expose('/')
+    def index(self):
+        """
+        return to backtesting home page
+        :return:
+        """
+        return self.render('welcome.html')
+
+    def is_accessible(self):
+        """
+        admin user access
+        :return:
+        """
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        """
+        Non admin user cannot accees this page
+        :param name:
+        :param kwargs:
+        :return: redirect to login
+        """
+        return redirect(url_for('login'))
+
+
+# admin
+admin = Admin(application)
+admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
+admin.add_view(UserModelView(User, db.session))
 
 
 if __name__ == "__main__":
