@@ -62,9 +62,6 @@ login_manager.login_message_category = 'info'
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
-# subprocess
-pro = None
-
 mail = Mail(application)
 application.register_blueprint(errors)
 
@@ -263,7 +260,6 @@ def upload_strategy():
 
     Returns:
         string: return message of upload status with corresponding pylint score
-        
     test_id = num -> it is for testing
     need to avoid local and cloud storage difference
     cloud path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
@@ -271,7 +267,7 @@ def upload_strategy():
     local has its own count
     and cloud has its own count
     """
-    
+
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
@@ -409,6 +405,8 @@ def account():
     elif request.method == 'GET':
         form.username.data = current_user.username
         form.email.data = current_user.email
+    else:
+        raise Exception("Invalid Operation")
     image_file = url_for('static',
                          filename='profile_pics/' + current_user.image_file)
     return render_template('account.html', title='Account',
@@ -452,22 +450,13 @@ def get_strategy_to_local(strategy_location):
     :param strategy_location: s3_resource loction
     :return: local strategy file path
     """
-
-    conn = rds.get_connection()
-    userid = pd.read_sql(
-        f"select id from backtest.user where email = '{current_user.email}';",
-        conn
-    )
-    current_usr = userid
-
     s3_resource = s3_util.init_s3()
 
     if "/" not in strategy_location:
         raise ValueError("Invalid Strategy Location.")
 
     s3_url_obj = s3_util.S3Url(strategy_location)
-
-    user_folder = f"strategies/user_id_{current_usr}"
+    user_folder = f"strategies/user_id_{current_user.id}"
     if not os.path.exists(user_folder):
         os.makedirs(user_folder)
         open(f"{user_folder}/__init__.py", 'a').close()
@@ -509,8 +498,8 @@ def display_strategy():
 @login_required
 def delete_strategy():
     """
-    delete stratege
-    :return: strageti html
+    delete strategy
+    :return: strategy html
     """
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
@@ -537,10 +526,7 @@ def backtest_progress():
     :return:
     """
     strategy_id = request.args.get('id')
-    current_usr = current_user.id
-
-    s_module = importlib.import_module(
-        f"strategies.user_id_{current_usr}.current_strategy")
+    current_usr_id = current_user.id
 
     n_days_back = 365  # we backtest using past 1 year's data
     past_n_days = [
@@ -548,6 +534,16 @@ def backtest_progress():
         datetime.timedelta(
             days=i) for i in range(n_days_back)]
     past_n_days = sorted(past_n_days)
+
+    s_module = importlib.import_module(
+        f"strategies.user_id_{current_usr_id}.current_strategy")
+
+    current_strategy = s_module.Strategy()
+
+    try:
+        strategy_cap = current_strategy.INIT_CAPITAL
+    except Exception as e_message:
+        logger.error(e_message)
 
     def backtest():
         """
@@ -558,6 +554,7 @@ def backtest_progress():
             'pnl': []
         }
         trades = collections.deque(maxlen=2)  # note: we only keep track of today and last day
+        trades.append({'price': None, 'position': None})
         for day_x in trange(n_days_back):
             one_tenth = n_days_back // 10
             if day_x % one_tenth == 0:
@@ -565,15 +562,14 @@ def backtest_progress():
             progress = {0: min(100 * day_x // n_days_back, 100)}
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
-            day_x_position = s_module.Strategy().get_position()
-            day_x = past_n_days[day_x]
-            total_value_x = compute_pnl(day_x, day_x_position)
-            position_df['value'].append(total_value_x)
+            trades.append({'price': current_strategy.get_price(), 'position': current_strategy.get_position()})
+            total_value_x = compute_pnl(trades[0].get('position'), trades[0].get('price'),
+                                        trades[1].get('price'), strategy_cap)
             pnl_df['pnl'].append(total_value_x)
 
         yield f"data:{json.dumps({0: 100})}\n\n"
         pnl_df['date'] = past_n_days
-        key = persist_to_s3(pnl_df, current_usr, strategy_id)
+        key = persist_to_s3(pnl_df, current_usr_id, strategy_id)
         update_backtest_db(strategy_id, application.config["S3_BUCKET"], key)
 
     return flask.Response(backtest(), mimetype='text/event-stream')
@@ -870,11 +866,11 @@ def check_py_validity(file, userid):
         os.makedirs(local_folder)
     local_cnt = sum([1 for _ in os.listdir(local_folder)])
     new_folder = "strategy" + str(local_cnt + 1)
-    
+
     local_strategy_folder = os.path.join(local_folder, new_folder)
     os.makedirs(local_strategy_folder)
     local_path = os.path.join(local_strategy_folder, file.filename)
-    logger.info(f"local testing path is {local_path}")
+    logger.info("local testing path is %s", local_path)
     file.save(local_path)
     result = Run([local_path], do_exit=False)
     # may be need threshold
@@ -926,7 +922,7 @@ def upload_strategy_to_s3(
 
     except Exception as exp_msg:
         logger("Something Happened: %s", exp_msg)
-        return e
+        return exp_msg
 
     return "{}{}".format(application.config["S3_LOCATION"], upload_path)
 
@@ -1134,7 +1130,8 @@ class User(db.Model, UserMixin):
         serialized = Serializer(application.config['SECRET_KEY'])
         try:
             user_id = serialized.loads(token)['user_id']
-        except:
+        except Exception as e_msg:
+            logger.error(e_msg)
             return None
         return User.query.get(user_id)
 
@@ -1146,5 +1143,4 @@ class User(db.Model, UserMixin):
 
 
 if __name__ == "__main__":
-    # application.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
     application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')

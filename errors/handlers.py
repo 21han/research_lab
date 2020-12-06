@@ -1,11 +1,10 @@
 """
 Error handers
 """
+
 import logging
 
 from flask import Blueprint, render_template
-
-import logging
 
 errors = Blueprint('errors', __name__)
 
