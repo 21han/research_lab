@@ -1525,4 +1525,4 @@ if __name__ == "__main__":
         '/dash_plot': dash_app.server
     })
 
-    run_simple("localhost", 5000, app_embeds, use_reloader=True, use_debugger=True, ssl_context="adhoc")
+    run_simple('localhost', 5000, app_embeds, use_reloader=True, use_debugger=True, ssl_context="adhoc")
