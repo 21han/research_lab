@@ -309,14 +309,36 @@ def upload_strategy():
     response = check_py_validity(file, userid)
 
     if '/' not in response:
+        # move coverage to same page
+        # this will be checked by frontend
         return response
 
-    local_path = response
+    local_path = response.split(':')[1]
+    status = response.split(':')[0]
     # Run pylint again to get the message
     # to pylint_stdout, which is an IO.byte
     (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
     pylint_message = pylint_stdout.read()
     pylint_message = clean_pylint_output(pylint_message)
+
+    # if the file is invalid, need to stop here
+    local_prefix = '/'.join(local_path.split('/')[:-1])
+    if "error" in status:
+        shutil.rmtree(local_prefix)
+        logger.info("pytest does not pass for a valid .py file")
+        report = (
+            "Your strategy has error or is not able to run! "
+            "Correct your file and upload again\n\n"
+            "*************Backend Check Information**************\n\n"
+        )
+        # append information
+        report = report + pylint_message
+        context = {
+            "username": current_user.username,
+            "report": report,
+            "message": "Your upload check detail will be shown here"
+        }
+        return render_template('upload.html', **context)
 
     test_id = request.args.get('test_id')
 
@@ -359,7 +381,6 @@ def upload_strategy():
 
     conn.commit()
 
-    local_prefix = '/'.join(local_path.split('/')[:-1])
 
     # remove the local file
     shutil.rmtree(local_prefix)
@@ -877,13 +898,18 @@ def check_py_validity(file, userid):
             result.linter.stats['global_note'] <= 0:
         logger.info("wrong file, remove")
 
-        shutil.rmtree(local_strategy_folder)
-        return "Your strategy has error or is not able to run! \
-            correct your file and upload again"
+        prefix = "has error:"
+    else:
+        prefix = "successful:"
 
-    logger.info("testing file has pylint score %s",
-                result.linter.stats['global_note'])
-    return local_path
+    logger.info(prefix)
+    if "successful" in prefix:
+        logger.info("uploaded: file has pylint score %s",
+                    result.linter.stats['global_note'])
+    else:
+        logger.info("check does not pass")
+    response = prefix + local_path
+    return response
 
 
 def upload_strategy_to_s3(
@@ -976,7 +1002,7 @@ def clean_pylint_output(pylint_message):
             components[0] = file
             clean_line = ':'.join(components)
         clean_output.append(clean_line)
-       
+
     clean_message = '\n'.join(clean_output)
     return clean_message
 
