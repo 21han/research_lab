@@ -129,7 +129,6 @@ def test_update_fig():
     :return:
     """
     fig1, fig2, fig3, fig4 = app.fig_update("s3://coms4156-strategies/0/backtest_113_test.csv")
-    # assert is not none
     assert type(fig1) == type(go.Figure()) and type(fig2) == type(go.Figure()) \
            and type(fig3) == type(go.Figure()) and isinstance(fig4, pd.DataFrame)
 
@@ -140,7 +139,6 @@ def test_update_fig_invalid():
     :return:
     """
     fig1, fig2, fig3, fig4 = app.fig_update(None)
-    # assert is not none
     assert not fig1 and not fig2 and not fig3 and not fig4
 
 
@@ -154,6 +152,7 @@ def test_get_plot():
     result = app.get_plot(["113"])
     assert result
 
+
 def test_get_plot_invalid():
     """
     Test get_plot with empty list, should return false to demonstrate nothing changed.
@@ -162,6 +161,7 @@ def test_get_plot_invalid():
 
     result = app.get_plot([])
     assert not result
+
 
 def update_layout():
     """

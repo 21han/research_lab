@@ -1487,11 +1487,9 @@ def get_plot(strategy_ids):
         global OptionList
         OptionList = [{'label': v, 'value': id_paths[k]} for k, v in strategy_names.items()]
         pnl_paths = [id_paths[k] for k in strategy_names.keys()]
-
         return True
 
-    else:
-        return False
+    return False
 
 
 def pnl_summary(data):
