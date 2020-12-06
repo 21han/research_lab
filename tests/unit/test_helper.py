@@ -104,3 +104,12 @@ def test_clean_pylint():
     clean_message = app.clean_pylint_output(pylint_message)
     assert "strategies/2/strategy2/" not in clean_message, \
         "do not clean the pylint output!"
+
+
+def test_get_backtest():
+    """
+    get_user_strategies(user_id)
+    NOTE: user_id 0 should be fixed
+    """
+    strategies = app.get_user_backtests(0)
+    assert len(strategies.columns) > 0
