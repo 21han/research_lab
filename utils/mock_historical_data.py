@@ -41,10 +41,11 @@ class MockData:
         """
         if not date:
             raise ValueError("invalid date. you must pass in a date first.")
-        ticker = ticker.upper()
+
         if ticker not in MockData.universe:
             raise ValueError(f"{ticker} is not valid. Valid Tickers are {MockData.universe}")
 
+        ticker = ticker.upper()
         random_factor = random.random()
         if ticker == "BTC":
             return random_factor * 20000
