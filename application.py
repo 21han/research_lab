@@ -22,10 +22,13 @@ from PIL import Image
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
 from flask import request
+from flask_admin import Admin, BaseView, expose
+from flask_admin.contrib.sqla import ModelView
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, current_user, login_required, \
     login_user, logout_user
 from flask_mail import Message, Mail
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
@@ -41,10 +44,6 @@ from wtforms.validators import DataRequired, Email, EqualTo, Length, \
 from errors.handlers import errors
 from user import OAuthUser
 from utils import s3_util, rds
-
-from flask_admin import Admin, BaseView, expose
-from flask_admin.contrib.sqla import ModelView
-from flask_migrate import Migrate
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -1173,64 +1172,6 @@ class UserModelView(ModelView):
         return self.render('errors/403.html')
 
 
-class OAuthUserView(BaseView):
-    """
-    OAuth User view
-    """
-    @expose('/')
-    def index(self):
-        """
-        can't access this page
-        :return:
-        """
-        return self.render('errors/403.html')
-
-    def is_accessible(self):
-        """
-
-        :return:
-        """
-        return current_user.is_authenticated and current_user.user_type == "admin"
-
-    def inaccessible_callback(self, name, **kwargs):
-        """
-
-        :param name:
-        :param kwargs:
-        :return:
-        """
-        return redirect(url_for('login'))
-
-
-class StrategiesView(BaseView):
-    """
-    Strategies view
-    """
-    @expose('/')
-    def index(self):
-        """
-
-        :return:
-        """
-        return self.render('errors/403.html')
-
-    def is_accessible(self):
-        """
-
-        :return:
-        """
-        return current_user.is_authenticated and current_user.user_type == "admin"
-
-    def inaccessible_callback(self, name, **kwargs):
-        """
-
-        :param name:
-        :param kwargs:
-        :return:
-        """
-        return redirect(url_for('login'))
-
-
 class HomePageView(BaseView):
     """
     Home page view
@@ -1238,24 +1179,24 @@ class HomePageView(BaseView):
     @expose('/')
     def index(self):
         """
-
+        return to backtesting home page
         :return:
         """
         return self.render('welcome.html')
 
     def is_accessible(self):
         """
-
+        admin user access
         :return:
         """
         return current_user.is_authenticated and current_user.user_type == "admin"
 
     def inaccessible_callback(self, name, **kwargs):
         """
-
+        Non admin user cannot accees this page
         :param name:
         :param kwargs:
-        :return:
+        :return: redirect to login
         """
         return redirect(url_for('login'))
 
@@ -1264,9 +1205,7 @@ class HomePageView(BaseView):
 admin = Admin(application)
 admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
 admin.add_view(UserModelView(User, db.session))
-# admin.add_view(OAuthUserView(name='OAuth User'))
-# admin.add_view(StrategiesView(name="Strategies"))
+
 
 if __name__ == "__main__":
-    application.run(debug=True, threaded=True, host='0.0.0.0', port='5000')
-    # application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
+    application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
