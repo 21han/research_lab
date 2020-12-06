@@ -24,3 +24,6 @@ MAIL_PORT                       = 587
 MAIL_USE_TLS                    = True
 MAIL_USERNAME                   = os.environ.get('MAIL_USERNAME')
 MAIL_PASSWORD                   = os.environ.get('MAIL_PASSWORD')
+GOOGLE_CLIENT_ID                = os.environ.get("GOOGLE_CLIENT_ID", None)
+GOOGLE_CLIENT_SECRET            = os.environ.get("GOOGLE_CLIENT_SECRET", None)
+GOOGLE_DISCOVERY_URL            = "https://accounts.google.com/.well-known/openid-configuration"

@@ -2,6 +2,7 @@
 application.py
 """
 
+import collections
 import datetime
 import importlib
 import json
@@ -12,35 +13,37 @@ import shutil
 import subprocess
 import threading
 import time
-import collections
 import webbrowser
+
 import flask
 import pandas as pd
+import requests
 from PIL import Image
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
 from flask import request
+from flask_admin import Admin, BaseView, expose
+from flask_admin.contrib.sqla import ModelView
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, current_user, login_required, \
     login_user, logout_user
 from flask_mail import Message, Mail
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
-from pylint.lint import Run
+from oauthlib.oauth2 import WebApplicationClient
 from pylint import epylint as lint
+from pylint.lint import Run
 from tqdm import trange
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-from utils import s3_util, rds
-import threading
-import subprocess
-import webbrowser
-from errors.handlers import errors
-from utils import mock_historical_data
 
+from errors.handlers import errors
+from user import OAuthUser
+from utils import s3_util, rds
 
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
@@ -62,26 +65,123 @@ login_manager.login_message_category = 'info'
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
+
+# email for send reset password token
 mail = Mail(application)
+
+# error handler
 application.register_blueprint(errors)
 
-# subprocess
-proc = None
+# Google OAuth login client
+client = WebApplicationClient(application.config["GOOGLE_CLIENT_ID"])
+migrate = Migrate(application, db)
 
 # endpoint routes
 
 
+@application.route("/OAuth_login")
+def oauth_login():
+    """
+    OAuth login route
+    :return:
+    """
+    google_provider_cfg = get_google_provider_cfg()
+    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
+    request_uri = client.prepare_request_uri(
+        authorization_endpoint,
+        redirect_uri=request.base_url + "/callback",
+        scope=["openid", "email", "profile"]
+    )
+    return redirect(request_uri)
+
+
+def get_google_provider_cfg():
+    """
+    get google provider config
+    :return:
+    """
+    return requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
+
+
+@application.route("/OAuth_login/callback")
+def callback():
+    """
+    OAuth login callback function from google auth page
+    :return:
+    """
+    code = request.args.get("code")
+    google_provider_cfg = get_google_provider_cfg()
+    token_endpoint = google_provider_cfg["token_endpoint"]
+    token_url, headers, body = client.prepare_token_request(
+        token_endpoint,
+        authorization_response=request.url,
+        redirect_url=request.base_url,
+        code=code
+    )
+    token_response = requests.post(
+        token_url,
+        headers=headers,
+        data=body,
+        auth=(application.config["GOOGLE_CLIENT_ID"], application.config["GOOGLE_CLIENT_SECRET"])
+    )
+    client.parse_request_body_response(json.dumps(token_response.json()))
+    userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
+    url, headers, body = client.add_token(userinfo_endpoint)
+    userinfo_response = requests.get(url, headers=headers, data=body)
+    if userinfo_response.json().get("email_verified"):
+        unique_id = userinfo_response.json()["sub"]
+        user_email = userinfo_response.json()["email"]
+        picture = userinfo_response.json()["picture"]
+        user_name = userinfo_response.json()["given_name"]
+        current_user.id = int(unique_id)
+    else:
+        return "User email not available or not verified by Google", 400
+    user = OAuthUser(
+        id_=unique_id, username=user_name, email=user_email, image_file=picture
+    )
+    if not OAuthUser.get(unique_id):
+        OAuthUser.create(unique_id, user_name, user_email, picture)
+    login_user(user)
+    return redirect(url_for("home"))
+
+
 @login_manager.user_loader
 def load_user(user_id):
-    """User object with input user id
-
-    Args:
-        user_id (int): primary key of user table
-
-    Returns:
-        User: User object with input user id
     """
-    return User.query.get(int(user_id))
+    load user from OAuth user table if id is found otherwise load user from user table
+    :param user_id:
+    :return:
+    """
+    if not OAuthUser.get(user_id):
+        return User.query.get(int(user_id))
+    return OAuthUser.get(user_id)
+
+
+@application.route("/home")
+@login_required
+def home():
+    """
+    home page after user login
+
+    :return: redirect user to upload page
+    """
+    if current_user.is_authenticated:
+        conn = rds.get_connection()
+        if isinstance(current_user.email, str):
+            userid = pd.read_sql(
+                f"select id from backtest.user where email = '{current_user.email}';",
+                conn
+            )
+            current_user.id = int(userid['id'].iloc[0])
+        else:
+            current_user.email = str(current_user.email['email'].iloc[0])
+            userid = pd.read_sql(
+                f"select id from backtest.OAuth_user where email = '{current_user.email}';",
+                conn
+            )
+            current_user.id = int(userid['id'].iloc[0])
+        return redirect('upload')
+    return render_template('welcome.html', title='About')
 
 
 @application.route("/")
@@ -95,23 +195,48 @@ def about():
     return render_template('welcome.html', title='About')
 
 
-@application.route("/home")
-@login_required
-def home():
-    """
-    home page after user login
+@application.route("/login", methods=['GET', 'POST'])
+def login():
+    """authenticate current user to access the platform with valid email and
+       password registered in user table
 
-    :return: redirect user to upload page
+    Returns:
+        function: render login.html page with title Login, redirect user to home page
+        when successfully authenticate
     """
     if current_user.is_authenticated:
-        conn = rds.get_connection()
-        userid = pd.read_sql(
-            f"select id from backtest.user where email = '{current_user.email}';",
-            conn
-        )
-        current_user.id = int(userid['id'].iloc[0])
-        return redirect('upload')
-    return render_template('welcome.html', title='About')
+        return redirect(url_for('home'))
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user and bcrypt.check_password_hash(user.password,
+                                               form.password.data) and user.is_approved == "Yes":
+            login_user(user, remember=form.remember.data)
+            current_user.email = form.email.data
+            current_user.user_type = user.user_type
+            current_user.id = user.id
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            else:
+                if user.user_type == "user":
+                    return redirect(url_for('home'))
+                elif user.user_type == "admin":
+                    return redirect(url_for('admin'))
+        else:
+            flash('Login Unsuccessful. Please check email and password. Waiting for admin approval',
+                  'danger')
+    return render_template('login.html', title='Login', form=form)
+
+
+@application.route("/logout")
+def logout():
+    """
+    logout current user
+    :return:
+    """
+    logout_user()
+    return redirect(url_for('about'))
 
 
 @application.route("/upload")
@@ -135,14 +260,21 @@ def upload_strategy():
 
     Returns:
         string: return message of upload status with corresponding pylint score
+    test_id = num -> it is for testing
+    need to avoid local and cloud storage difference
+    cloud path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
+
+    local has its own count
+    and cloud has its own count
     """
+
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
         return "Strategy name may not be empty"
     file = request.files["user_file"]
     name = request.form["strategy_name"]
-    
+
     message = check_upload_file(file)
     if message != "OK":
         return message
@@ -150,33 +282,38 @@ def upload_strategy():
     # get the number of folders
     bucket_name = application.config["S3_BUCKET"]
 
-    # path: e.g. s3://com34156-strategies/{user_id}/strategy_num/{strategy_name}.py
-    
-    conn = rds.get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT MAX(strategy_id) as m FROM backtest.strategies"
-    )
-    for id in cursor.fetchall():
-        cnt_loc = id['m']
-        break
-
-    logger.info("max + 1 is - %s", cnt_loc+1)
-    new_folder = "strategy" + str(cnt_loc+1)
-
     userid = str(current_user.id)
-    response = check_py_validity(file, userid, new_folder)
+    response = check_py_validity(file, userid)
 
     if '/' not in response:
         return response
-    
+
     local_path = response
     # Run pylint again to get the message
     # to pylint_stdout, which is an IO.byte
     (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
     pylint_message = pylint_stdout.read()
-    
-    strategy_folder = os.path.join(userid, new_folder)
+
+    test_id = request.args.get('test_id')
+
+    conn = rds.get_connection()
+    cursor = conn.cursor()
+    if test_id is not None:
+        test_id = int(test_id)
+        logger.info("uploading testing file...")
+        cnt_loc = test_id
+    else:
+        logger.info("uploading user file...")
+        cursor.execute(
+            "SELECT MAX(strategy_id) as max_strategy FROM backtest.strategies"
+        )
+        first = cursor.fetchone()
+        cnt_loc = first['max_strategy']
+        cnt_loc += 1
+        logger.info("max + 1 is - %s", cnt_loc)
+
+    cloud_new_folder = "strategy" + str(cnt_loc)
+    strategy_folder = os.path.join(userid, cloud_new_folder)
     # upload to s3 bucket
     filepath = upload_strategy_to_s3(
         local_path, bucket_name, strategy_folder
@@ -189,60 +326,29 @@ def upload_strategy():
     timestamp = str(datetime.datetime.now())
 
     query = "INSERT INTO backtest.strategies (user_id, strategy_location, \
-            last_modified_date, last_modified_user, strategy_name) \
-                    VALUES (%s,%s,%s,%s,%s)"
-
+        last_modified_date, last_modified_user, strategy_name) \
+                VALUES (%s,%s,%s,%s,%s)"
     username = current_user.username
     cursor.execute(
         query, (current_user.id, filepath, timestamp, username, name)
     )
 
     conn.commit()
-    
-    local_folder = os.path.join('strategies/', userid)
-    local_strategy_folder = os.path.join(local_folder, new_folder)
-    shutil.rmtree(local_strategy_folder)
+
+    local_prefix = '/'.join(local_path.split('/')[:-1])
+
+    # remove the local file
+    shutil.rmtree(local_prefix)
 
     logger.info(f"affected rows = {cursor.rowcount}")
     message = "Your strategy " + name + \
               " is uploaded successfully under " + \
               "/".join(filepath.split('/')[-2:]) + " path"
-              
+
     context = {"username": current_user.username,
                "report": pylint_message,
                "message": message}
     return render_template('upload.html', **context)
-
-
-@application.route("/login", methods=['GET', 'POST'])
-def login():
-    """authenticate current user to access the platform with valid email and
-       password registered in user table
-
-    Returns:
-        function: render login.html page with title Login, redirect user to home page
-        when successfully authenticate
-    """
-
-    if current_user.is_authenticated:
-        return redirect(url_for('home'))
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
-        if user and bcrypt.check_password_hash(user.password,
-                                               form.password.data):
-            login_user(user, remember=form.remember.data)
-            current_user.email = form.email.data
-            next_page = request.args.get('next')
-            if next_page:
-                return redirect(next_page)
-            else:
-                return redirect(url_for('home'))
-        else:
-            flash('Login Unsuccessful. Please check email and password',
-                  'danger')
-    logger.info("NOT AUTHENTICATED")
-    return render_template('login.html', title='Login', form=form)
 
 
 @application.route("/register", methods=['GET', 'POST'])
@@ -260,32 +366,23 @@ def register():
                     email=form.email.data, password=hashed_password)
         db.session.add(user)
         db.session.commit()
-        flash(f'Your account has been created! You are now able to log in',
-              'success')
+        flash(
+            f'Your account has been created! An admin is reviewing your registration request, please check-in again in 24 hours',
+            'success')
         return redirect(url_for('login'))
     return render_template(
         'register.html', title='Register', form=form)
 
 
 @application.route("/admin", methods=['GET', 'POST'])
+@login_required
 def admin():
     """render admin user page
 
     Returns:
-        function: render admin.html page
+        function: render falsk admin page
     """
-    return render_template('admin.html')
-
-
-@application.route("/logout")
-def logout():
-    """logout current user and kill the user's session
-
-    Returns:
-        function: redirect user to welcome page
-    """
-    logout_user()
-    return redirect('welcome')
+    return redirect('/admin/')
 
 
 @application.route("/account", methods=['GET', 'POST'])
@@ -310,6 +407,8 @@ def account():
     elif request.method == 'GET':
         form.username.data = current_user.username
         form.email.data = current_user.email
+    else:
+        raise Exception("Invalid Operation")
     image_file = url_for('static',
                          filename='profile_pics/' + current_user.image_file)
     return render_template('account.html', title='Account',
@@ -324,7 +423,19 @@ def all_strategy():
     Returns:
         function: render strategies.html page
     """
-
+    if not isinstance(current_user.id, int):
+        conn = rds.get_connection()
+        current_user.email = str(current_user.email['email'].iloc[0])
+        userid = pd.read_sql(
+            f"select id from backtest.OAuth_user where email = '{current_user.email}';",
+            conn
+        )
+        current_user.id = int(userid['id'].iloc[0])
+        user_name = pd.read_sql(
+            f"select username from backtest.OAuth_user where email = '{current_user.email}';",
+            conn
+        )
+        current_user.username = str(user_name['username'].iloc[0])
     current_user_id = current_user.id
     username = current_user.username
     all_user_strategies = get_user_strategies(current_user_id)
@@ -341,22 +452,13 @@ def get_strategy_to_local(strategy_location):
     :param strategy_location: s3_resource loction
     :return: local strategy file path
     """
-
-    conn = rds.get_connection()
-    userid = pd.read_sql(
-        f"select id from backtest.user where email = '{current_user.email}';",
-        conn
-    )
-    current_usr = userid
-
     s3_resource = s3_util.init_s3()
 
     if "/" not in strategy_location:
         raise ValueError("Invalid Strategy Location.")
 
     s3_url_obj = s3_util.S3Url(strategy_location)
-
-    user_folder = f"strategies/user_id_{current_usr}"
+    user_folder = f"strategies/user_id_{current_user.id}"
     if not os.path.exists(user_folder):
         os.makedirs(user_folder)
         open(f"{user_folder}/__init__.py", 'a').close()
@@ -398,8 +500,8 @@ def display_strategy():
 @login_required
 def delete_strategy():
     """
-    delete stratege
-    :return: strageti html
+    delete strategy
+    :return: strategy html
     """
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
@@ -426,10 +528,7 @@ def backtest_progress():
     :return:
     """
     strategy_id = request.args.get('id')
-    current_usr = current_user.id
-
-    s_module = importlib.import_module(
-        f"strategies.user_id_{current_usr}.current_strategy")
+    current_usr_id = current_user.id
 
     n_days_back = 365  # we backtest using past 1 year's data
     past_n_days = [
@@ -438,12 +537,26 @@ def backtest_progress():
             days=i) for i in range(n_days_back)]
     past_n_days = sorted(past_n_days)
 
+    s_module = importlib.import_module(
+        f"strategies.user_id_{current_usr_id}.current_strategy")
+
+    current_strategy = s_module.Strategy()
+
+    try:
+        strategy_cap = current_strategy.INIT_CAPITAL
+    except Exception as e_message:
+        logger.error(e_message)
+
     def backtest():
+        """
+        to backtest by iterating through each day
+        :return:
+        """
         pnl_df = {
             'pnl': []
         }
-        """ to backtest by iterating through each day"""
         trades = collections.deque(maxlen=2)  # note: we only keep track of today and last day
+        trades.append({'price': None, 'position': None})
         for day_x in trange(n_days_back):
             one_tenth = n_days_back // 10
             if day_x % one_tenth == 0:
@@ -451,16 +564,16 @@ def backtest_progress():
             progress = {0: min(100 * day_x // n_days_back, 100)}
             ret_string = f"data:{json.dumps(progress)}\n\n"
             yield ret_string
-            day_x_position = s_module.Strategy().get_position()
-            day_x = past_n_days[day_x]
-            total_value_x = compute_pnl(day_x, day_x_position)
-            position_df['value'].append(total_value_x)
+            trades.append({'price': current_strategy.get_price(), 'position': current_strategy.get_position()})
+            total_value_x = compute_pnl(trades[0].get('position'), trades[0].get('price'),
+                                        trades[1].get('price'), strategy_cap)
             pnl_df['pnl'].append(total_value_x)
 
         yield f"data:{json.dumps({0: 100})}\n\n"
         pnl_df['date'] = past_n_days
-        key = persist_to_s3(pnl_df, current_usr, strategy_id)
+        key = persist_to_s3(pnl_df, current_usr_id, strategy_id)
         update_backtest_db(strategy_id, application.config["S3_BUCKET"], key)
+
     return flask.Response(backtest(), mimetype='text/event-stream')
 
 
@@ -632,10 +745,7 @@ def send_reset_email(user):
     send reset password request to the registered email
     :param user:
     :return:
-    
-    
-    
-    
+
     """
     token = user.get_reset_token()
     msg = Message('Password Reset Request',
@@ -725,7 +835,6 @@ def get_strategy_location(strategy_id):
 
 def allowed_file(filename):
     """allowed file extension
-
     Args:
         filename ([string]): the file name including the extension
 
@@ -746,7 +855,6 @@ def check_upload_file(file):
     file.mimetype
     Args:
         file ([request]): in flask.request["file"], io.byte type
-  
     """
     if file.filename == "":
         return "Please select a file"
@@ -755,14 +863,14 @@ def check_upload_file(file):
         return "Your file extension type is not allowed"
 
     if not file:
-        return "File not found. Please upload it again"    
+        return "File not found. Please upload it again"
 
     return "OK"
 
 
-def check_py_validity(file, userid, new_folder):
+def check_py_validity(file, userid):
     """run pylint on file to check if correct
-
+    store file in local
     Args:
         file (str): flask file
         userid(int)
@@ -772,17 +880,18 @@ def check_py_validity(file, userid, new_folder):
     local_folder = os.path.join('strategies/', userid)
     if not os.path.exists(local_folder):
         os.makedirs(local_folder)
+    local_cnt = sum([1 for _ in os.listdir(local_folder)])
+    new_folder = "strategy" + str(local_cnt + 1)
 
     local_strategy_folder = os.path.join(local_folder, new_folder)
     os.makedirs(local_strategy_folder)
     local_path = os.path.join(local_strategy_folder, file.filename)
-    logger.info(f"local testing path is {local_path}")
+    logger.info("local testing path is %s", local_path)
     file.save(local_path)
     result = Run([local_path], do_exit=False)
-
     # may be need threshold
     logger.info(result.linter.stats)
-    
+
     if "global_note" not in result.linter.stats or \
             result.linter.stats['global_note'] <= 0:
         logger.info("wrong file, remove")
@@ -791,9 +900,10 @@ def check_py_validity(file, userid, new_folder):
         return "Your strategy has error or is not able to run! \
             correct your file and upload again"
 
-    logger.info("testing file has pylint score %s", 
+    logger.info("testing file has pylint score %s",
                 result.linter.stats['global_note'])
     return local_path
+
 
 def upload_strategy_to_s3(
         file, bucket_name, file_prefix):
@@ -828,7 +938,7 @@ def upload_strategy_to_s3(
 
     except Exception as exp_msg:
         logger("Something Happened: %s", exp_msg)
-        return e
+        return exp_msg
 
     return "{}{}".format(application.config["S3_LOCATION"], upload_path)
 
@@ -966,18 +1076,30 @@ class UpdateAccountForm(FlaskForm):
                 raise ValidationError(
                     'That email is taken. Please choose a different one.')
 
+
 class RequestResetForm(FlaskForm):
+    """
+    Request reset form
+    """
     email = StringField('Email',
                         validators=[DataRequired(), Email()])
     submit = SubmitField('Request Password Reset')
 
     def validate_email(self, email):
+        """
+
+        :param email:
+        :return:
+        """
         user = User.query.filter_by(email=email.data).first()
         if user is None:
             raise ValidationError('There is no account with that email. You must register first.')
 
 
 class ResetPasswordForm(FlaskForm):
+    """
+    Reset Password form
+    """
     password = PasswordField('Password', validators=[DataRequired()])
     confirm_password = PasswordField('Confirm Password',
                                      validators=[DataRequired(), EqualTo('password')])
@@ -1006,14 +1128,16 @@ class User(db.Model, UserMixin):
         default='default.jpg')
     password = db.Column(db.String(60), nullable=False)
 
+    is_approved = db.Column(db.String(10), nullable=False, default='No')
+    user_type = db.Column(db.String(10), nullable=False, default='user')
+
     def get_reset_token(self, expires_sec=1800):
         """ get a reset token (expire in 1800 seconds)
-
         :param expires_sec: set the token expire period to 1800 seconds
         :return:
         """
-        s = Serializer(application.config['SECRET_KEY'], expires_sec)
-        return s.dumps({'user_id': self.id}).decode('utf-8')
+        serialized = Serializer(application.config['SECRET_KEY'], expires_sec)
+        return serialized.dumps({'user_id': self.id}).decode('utf-8')
 
     @staticmethod
     def verify_reset_token(token):
@@ -1022,10 +1146,11 @@ class User(db.Model, UserMixin):
         :param token: secret token
         :return:
         """
-        s = Serializer(application.config['SECRET_KEY'])
+        serialized = Serializer(application.config['SECRET_KEY'])
         try:
-            user_id = s.loads(token)['user_id']
-        except:
+            user_id = serialized.loads(token)['user_id']
+        except Exception as e_msg:
+            logger.error(e_msg)
             return None
         return User.query.get(user_id)
 
@@ -1036,6 +1161,61 @@ class User(db.Model, UserMixin):
         return f"User('{self.id}', '{self.username}', '{self.email}')"
 
 
+class UserModelView(ModelView):
+    """
+    User view
+    """
+    def is_accessible(self):
+        """
+        check if user can access admin page
+        :return: admin user redirect to admin page
+        """
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        """
+        return 403 page if not access admin page
+        :param name:
+        :param kwargs:
+        :return: 403 error page
+        """
+        return self.render('errors/403.html')
+
+
+class HomePageView(BaseView):
+    """
+    Home page view
+    """
+    @expose('/')
+    def index(self):
+        """
+        return to backtesting home page
+        :return:
+        """
+        return self.render('welcome.html')
+
+    def is_accessible(self):
+        """
+        admin user access
+        :return:
+        """
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        """
+        Non admin user cannot accees this page
+        :param name:
+        :param kwargs:
+        :return: redirect to login
+        """
+        return redirect(url_for('login'))
+
+
+# admin
+admin = Admin(application)
+admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
+admin.add_view(UserModelView(User, db.session))
+
+
 if __name__ == "__main__":
-    application.debug = True
-    application.run(debug=False, threaded=True, host='0.0.0.0', port='5000')
+    application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
