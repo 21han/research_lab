@@ -295,6 +295,7 @@ def upload_strategy():
     # to pylint_stdout, which is an IO.byte
     (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
     pylint_message = pylint_stdout.read()
+    pylint_message = clean_pylint_output(pylint_message)
 
     test_id = request.args.get('test_id')
 
@@ -344,8 +345,12 @@ def upload_strategy():
 
     logger.info(f"affected rows = {cursor.rowcount}")
     message = "Your strategy " + name + \
-              " is uploaded successfully under " + \
-              "/".join(filepath.split('/')[-2:]) + " path"
+              " is uploaded successfully!"
+
+    # TODO: may need to clean
+    # message = "Your strategy " + name + \
+    #           " is uploaded successfully under " + \
+    #           "/".join(filepath.split('/')[-2:]) + " path"
 
     context = {"username": current_user.username,
                "report": pylint_message,
@@ -962,6 +967,30 @@ def delete_strategy_by_user(filepath):
     conn.commit()
     logger.info("affected rows = %d", cursor.rowcount)
     logger.info("Delete file from Database")
+
+
+def clean_pylint_output(pylint_message):
+    """clean pylint message
+
+    Args:
+        pylint_message (pylint_message): 
+        we need to clean pylint output to give
+        a cleaner output
+    """
+    break_lines = pylint_message.split('\n')
+    clean_output = []
+    for line in break_lines:
+        clean_line = line
+        if ".py:" in line:
+            # target line
+            components = line.split(':')
+            file = components[0].split('/')[-1]
+            components[0] = file
+            clean_line = ':'.join(components)
+        clean_output.append(clean_line)
+       
+    clean_message = '\n'.join(clean_output)
+    return clean_message
 
 
 # Forms: registration, login, account
