@@ -52,9 +52,10 @@ def test_wrongly_upload_strategy():
         )
 
 
-def test_upload_strategy():
+def test_upload_and_delete_strategy():
     """
     test uploading strategies
+    also deleting it afterwards
     """
     prefix = os.path.join('-1/', 'strategy7')
     location = app.upload_strategy_to_s3(
@@ -64,11 +65,7 @@ def test_upload_strategy():
         )
     assert location == os.path.join(S3_LOCATION, prefix, 'helpers.py')
 
-
-def test_delete_strategy():
-    """
-    test delete strategies
-    """
+    # delete
     prefix = os.path.join('-1/', 'strategy7')
     filepath = os.path.join(S3_LOCATION, prefix, 'helpers.py')
     app.delete_strategy_by_user(filepath)
