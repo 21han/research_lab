@@ -282,10 +282,11 @@ def upload_strategy():
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
-        return "Strategy name may not be empty"
+        return "No strategy name specified"
     file = request.files["user_file"]
     name = request.form["strategy_name"]
-
+    if name == "":
+        return "Strategy name may not be empty"
     message = check_upload_file(file)
     if message != "OK":
         return message
@@ -851,10 +852,8 @@ def check_upload_file(file):
 
     if not allowed_file(file.filename):
         return "Your file extension type is not allowed"
-
     if not file:
         return "File not found. Please upload it again"
-
     return "OK"
 
 
@@ -932,8 +931,8 @@ def upload_strategy_to_s3(
         )
 
     except Exception as exp_msg:
-        logger("Something Happened: %s", exp_msg)
-        return exp_msg
+        logger.info("Something Happened: %s", exp_msg)
+        raise
 
     return "{}{}".format(application.config["S3_LOCATION"], upload_path)
 

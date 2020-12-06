@@ -4,8 +4,10 @@ this is the test for helper function in application.py
 
 import application as app
 import os
+import pytest
 from utils import s3_util
 from config import S3_LOCATION, S3_BUCKET
+from boto3.exceptions import S3UploadFailedError
 
 
 def test_get_strategies():
@@ -36,9 +38,24 @@ def test_allow_file():
     assert not app.allowed_file("test.txt")
 
 
-def test_upload_strategy():
+def test_wrongly_upload_strategy():
+    """
+    programmers may upload strategy in a wrong way
+    """
+    prefix = os.path.join('-1/', 'strategy7')
+
+    with pytest.raises(S3UploadFailedError):
+        app.upload_strategy_to_s3(
+            "tests/uploads/helpers.py",
+            "Wrong_S3_PATH",
+            prefix
+        )
+
+
+def test_upload_and_delete_strategy():
     """
     test uploading strategies
+    also deleting it afterwards
     """
     prefix = os.path.join('-1/', 'strategy7')
     location = app.upload_strategy_to_s3(
@@ -48,11 +65,7 @@ def test_upload_strategy():
         )
     assert location == os.path.join(S3_LOCATION, prefix, 'helpers.py')
 
-
-def test_delete_strategy():
-    """
-    test delete strategies
-    """
+    # delete
     prefix = os.path.join('-1/', 'strategy7')
     filepath = os.path.join(S3_LOCATION, prefix, 'helpers.py')
     app.delete_strategy_by_user(filepath)
@@ -82,7 +95,7 @@ def test_compute_pnl():
         {'BTC': 0.2, 'ETH': 0.8},
         {'BTC': 10, 'ETH': 2},
         {'BTC': 9, 'ETH': 1.5}, 100) == (100*0.2/10)*9+(100*0.8/2)*1.5-100
-  
+
 
 def test_clean_pylint():
     """
