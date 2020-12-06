@@ -92,6 +92,8 @@ migrate = Migrate(application, db)
 
 # dash object
 dash_app = Dash(__name__, server=application, url_base_pathname='/dash_plots/')
+dash_app.validation_layout = True
+dash_app._layout = html.Div()
 # global variables for update dash dynamically depending on different user
 OptionList = []
 pnl_paths = []
@@ -1518,6 +1520,7 @@ if __name__ == "__main__":
     application.debug = True
 
     dash_app.layout = new_plot
+
     app_embeds = DispatcherMiddleware(application, {
         '/dash_plot': dash_app.server
     })
