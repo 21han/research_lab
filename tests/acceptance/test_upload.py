@@ -15,14 +15,35 @@ class TestUpload(TestBase):
     """
     TestUpload
     """
+    def test_can_access_upload_page(self):
+        """
+        User story:
+        User should be able to upload strategy: go to /upload
+        endpoint
+        """
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
+        )
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the test user")
+
+        response = self.app.get(
+            "/upload"
+        )
+        self.assertIn(b"Upload Your File", response.data,
+                      "cannot get to /upload endpoint")        
+
     def test_upload_valid_strategy_and_delete(self):
         """
         Common cases 1.1: valid upload:
         '
         Investment professionals should be able to upload valid strategies and corresponding data with the strategy successfully.
-        
+ 
         AND
-        
+
         Common cases 4: delete
         Investment professionals should be able to delete any strategies/data/results they don’t want anymore.
         '
@@ -119,6 +140,31 @@ class TestUpload(TestBase):
         self.assertIn(b"error", response.data,
                       "file error cannot be checked")
 
+    def test_upload_no_strategy_name(self):
+        """
+        The test strategy name is not there
+        """
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
+        )
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the test user")
+
+        data = {}  # no strategy name
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+
+        self.assertIn(b"No strategy name specified", response.data,
+                      "cannot check no strategy_name field")
+
     def test_upload_empty_file(self):
         """
         special case 1: empty file
@@ -150,3 +196,50 @@ class TestUpload(TestBase):
                          "User cannot upload a valid file")
         self.assertIn(b"select a file", response.data,
                       "cannot check empty file")
+
+    def test_upload_no_user_file(self):
+        """
+        user cannot upload a data without file
+        """
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
+        )
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the test user")
+
+        data = {'strategy_name': 'strategy'}  # no user_file fields
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+
+        self.assertIn(b"No user_file is specified", response.data,
+                      "cannot check no user_file fiels")
+
+    def test_upload_empty_strategy_name(self):
+        """
+        strategy name cannot be empty
+        """
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
+        )
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the test user")
+
+        data = {'strategy_name': ''}  # no strategy name
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+
+        self.assertIn(b"Strategy name may not be empty", response.data,
+                      "cannot check empty strategy_name field")
