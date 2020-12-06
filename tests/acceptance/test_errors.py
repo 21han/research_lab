@@ -4,7 +4,6 @@ test / or /errors handler
 
 from .test_baseclass import TestBase
 
-
 class TestError(TestBase):
     """
     Test Error page 404
@@ -21,8 +20,6 @@ class TestError(TestBase):
             404,
             "cannot catch 404 error"
         )
-
-
 
 
 

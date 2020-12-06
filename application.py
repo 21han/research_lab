@@ -108,22 +108,15 @@ def oauth_login():
     OAuth login route
     :return:
     """
-    google_provider_cfg = get_google_provider_cfg()
+    google_provider_cfg = requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
     authorization_endpoint = google_provider_cfg["authorization_endpoint"]
     request_uri = client.prepare_request_uri(
         authorization_endpoint,
         redirect_uri=request.base_url + "/callback",
         scope=["openid", "email", "profile"]
     )
+    logger.info(request_uri)
     return redirect(request_uri)
-
-
-def get_google_provider_cfg():
-    """
-    get google provider config
-    :return:
-    """
-    return requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
 
 
 @application.route("/OAuth_login/callback")
@@ -133,7 +126,7 @@ def callback():
     :return:
     """
     code = request.args.get("code")
-    google_provider_cfg = get_google_provider_cfg()
+    google_provider_cfg = requests.get(application.config["GOOGLE_DISCOVERY_URL"]).json()
     token_endpoint = google_provider_cfg["token_endpoint"]
     token_url, headers, body = client.prepare_token_request(
         token_endpoint,
