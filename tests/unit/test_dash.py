@@ -4,7 +4,6 @@ This file contains all the tests for the dash part in application.py
 
 import numpy as np
 import pandas as pd
-import dash_app
 import application as app
 
 TOTAL_CAPITAL = 10 ** 6
