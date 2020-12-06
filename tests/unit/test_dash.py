@@ -5,6 +5,9 @@ This file contains all the tests for the dash part in application.py
 import numpy as np
 import pandas as pd
 import application as app
+import dash_html_components as html
+import plotly.graph_objects as go
+import plotly.express as px
 
 TOTAL_CAPITAL = 10 ** 6
 
@@ -109,3 +112,70 @@ def test_kurtosis():
     kui = str(round(data['pnl'].kurtosis(), 2))
     assert kui == result['Value'].iloc[6]
 
+
+def test_layout():
+    """
+    Test if new_plot() gives a valid layout for dash code.
+    :return:
+    """
+    layout = app.new_plot()
+    assert type(layout) == type(html.Div())
+
+
+def test_update_fig():
+    """
+    Test if fig_update() will return four valid graphs by giving a valid backtest path in s3.
+    The return variables are px, go.Figure(), go.Figure() and Dataframe
+    :return:
+    """
+    fig1, fig2, fig3, fig4 = app.fig_update("s3://coms4156-strategies/0/backtest_113_test.csv")
+    # assert is not none
+    assert type(fig1) == type(go.Figure()) and type(fig2) == type(go.Figure()) \
+           and type(fig3) == type(go.Figure()) and isinstance(fig4, pd.DataFrame)
+
+
+def test_update_fig_invalid():
+    """
+    Test if fig_update() will return four None graphs by giving None for the path.
+    :return:
+    """
+    fig1, fig2, fig3, fig4 = app.fig_update(None)
+    # assert is not none
+    assert not fig1 and not fig2 and not fig3 and not fig4
+
+
+def test_get_plot():
+    """
+    Test get_plot with valid strategy id list, should return true
+    to demonstrate we update global variables in application.
+    :return:
+    """
+
+    result = app.get_plot(["113"])
+    assert result
+
+def test_get_plot_invalid():
+    """
+    Test get_plot with empty list, should return false to demonstrate nothing changed.
+    :return:
+    """
+
+    result = app.get_plot([])
+    assert not result
+
+def update_layout():
+    """
+    Test update_layout with valid user id 0.
+    :return:
+    """
+    result = update_layout(0)
+    assert result
+
+
+def update_layout_invalid():
+    """
+    Test update_layout with invalid user id -1.
+    :return:
+    """
+    result = update_layout(-1)
+    assert not result
