@@ -82,4 +82,25 @@ def test_compute_pnl():
         {'BTC': 0.2, 'ETH': 0.8},
         {'BTC': 10, 'ETH': 2},
         {'BTC': 9, 'ETH': 1.5}, 100) == (100*0.2/10)*9+(100*0.8/2)*1.5-100
+  
 
+def test_clean_pylint():
+    """
+    test if pylint output has clean output
+    """
+
+    pylint_message = (
+        '''************* Module user\n'''
+        '''strategies/2/strategy2/user.py:15: convention (C0103,'''
+        '''invalid-name, OAuthUser.__init__) Attribute name "id"'''
+        '''doesn't conform to snake_case naming style\n'''
+        '''\n'''
+        '''--------------------------------'''
+        '''----------------------------------\n'''
+        '''Your code has been rated at 9.62/10 '''
+        '''(previous run: 9.62/10, +0.00)'''
+    )
+
+    clean_message = app.clean_pylint_output(pylint_message)
+    assert "strategies/2/strategy2/" not in clean_message, \
+        "do not clean the pylint output!"
