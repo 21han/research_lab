@@ -347,11 +347,6 @@ def upload_strategy():
     message = "Your strategy " + name + \
               " is uploaded successfully!"
 
-    # TODO: may need to clean
-    # message = "Your strategy " + name + \
-    #           " is uploaded successfully under " + \
-    #           "/".join(filepath.split('/')[-2:]) + " path"
-
     context = {"username": current_user.username,
                "report": pylint_message,
                "message": message}
