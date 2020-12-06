@@ -71,11 +71,13 @@ def get_all_backtests(user_id):
 
 def get_all_locations(strategy_ids):
     """
-        get all backtest results of a user
-        :param user_id: current user
-        :return: backtest results in pd.dataframe
-        """
+    get all pnl locations from a list of strategy_ids
+    :param strategy_ids: a list of strategy ids
+    :return: backtest results in pd.dataframe
+    """
     conn = get_connection()
+    # cast int array to str array just in case
+    strategy_ids = [str(i) for i in strategy_ids]
     ids = "( " + ",".join(strategy_ids) + " )"
 
     backtest_df = pd.read_sql(

@@ -45,6 +45,20 @@ from errors.handlers import errors
 from user import OAuthUser
 from utils import s3_util, rds
 
+from dash import Dash
+import plotly.graph_objects as go
+from dash.dependencies import Input, Output, State
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+import dash_bootstrap_components as dbc
+import dash_core_components as dcc
+import dash_html_components as html
+import dash_table as dt
+import numpy as np
+import plotly.express as px
+from werkzeug.serving import run_simple
+from dash.exceptions import PreventUpdate
+
+
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 
@@ -74,9 +88,16 @@ application.register_blueprint(errors)
 
 # Google OAuth login client
 client = WebApplicationClient(application.config["GOOGLE_CLIENT_ID"])
-
 migrate = Migrate(application, db)
 
+# dash object
+dash_app = Dash(__name__, server=application, url_base_pathname='/dash_plots/')
+dash_app.validation_layout = True
+dash_app._layout = html.Div()
+# global variables for update dash dynamically depending on different user
+OptionList = []
+pnl_paths = []
+TOTAL_CAPITAL = 10 ** 6
 
 # endpoint routes
 
@@ -289,13 +310,36 @@ def upload_strategy():
     response = check_py_validity(file, userid)
 
     if '/' not in response:
+        # move coverage to same page
+        # this will be checked by frontend
         return response
 
-    local_path = response
+    local_path = response.split(':')[1]
+    status = response.split(':')[0]
     # Run pylint again to get the message
     # to pylint_stdout, which is an IO.byte
     (pylint_stdout, _) = lint.py_run(local_path, return_std=True)
     pylint_message = pylint_stdout.read()
+    pylint_message = clean_pylint_output(pylint_message)
+
+    # if the file is invalid, need to stop here
+    local_prefix = '/'.join(local_path.split('/')[:-1])
+    if "error" in status:
+        shutil.rmtree(local_prefix)
+        logger.info("pytest does not pass for a valid .py file")
+        report = (
+            "Your strategy has error or is not able to run! "
+            "Correct your file and upload again\n\n"
+            "*************Backend Check Information**************\n\n"
+        )
+        # append information
+        report = report + pylint_message
+        context = {
+            "username": current_user.username,
+            "report": report,
+            "message": "Your upload check detail will be shown here"
+        }
+        return render_template('upload.html', **context)
 
     test_id = request.args.get('test_id')
 
@@ -338,15 +382,13 @@ def upload_strategy():
 
     conn.commit()
 
-    local_prefix = '/'.join(local_path.split('/')[:-1])
 
     # remove the local file
     shutil.rmtree(local_prefix)
 
     logger.info(f"affected rows = {cursor.rowcount}")
     message = "Your strategy " + name + \
-              " is uploaded successfully under " + \
-              "/".join(filepath.split('/')[-2:]) + " path"
+              " is uploaded successfully!"
 
     context = {"username": current_user.username,
                "report": pylint_message,
@@ -639,54 +681,26 @@ def compute_pnl(previous_day_position, prev_day_price, current_day_price, init_c
     return pnl
 
 
-@application.route('/results')
+@application.route('/results/', methods=['GET'])
 @login_required
-def display_results():
-    """display all the backtest results with selection option
-        Returns:
-            function: results.html
+def user_results():
     """
-    # display all user backtest results as a table on the U.I.
-    current_user_id = current_user.id
-    user_backests = get_user_backtests(current_user_id)
-    return render_template("results.html", df=user_backests)
-
-
-@application.route('/plots', methods=['POST'])
-# @login_required
-def run_dash():
+    Redirect to dosh route for visualization.
+    :return:
     """
-    Run dash application first in this function
-        and then open then dash url in the new window.
-        It will go back to /results for other selections.
-    :return: redirect to /results
+    user_id = current_user.id
+    update_layout(user_id)
+    return redirect('/dash_plots')
+
+
+@application.route('/dash_plots/', methods=['GET'])
+@login_required
+def render_reports():
     """
-    strategy_ids = request.form.get('ids').split(',')
-    cmd = strategy_ids
-    cmd.insert(0, 'dash_app.py')
-    cmd.insert(0, 'python')
-
-    proc = subprocess.Popen(cmd,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
-    t = threading.Thread(target=output_reader, args=(proc,))
-    t.start()
-
-    try:
-        time.sleep(3)
-        webbrowser.open('http://localhost:8050')
-        # assert b'Directory listing' in resp.read()
-        time.sleep(5)
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=1)
-            logger.info('== subprocess exited with rc =%d', proc.returncode)
-        except subprocess.TimeoutExpired:
-            logger.info('subprocess did not terminate in time')
-    t.join()
-
-    return redirect('/results')
+    Redirect flask endpoint to dash server endpoint.
+    :return:
+    """
+    return flask.redirect('/dash_plot')
 
 
 @application.route("/reset_password", methods=['GET', 'POST'])
@@ -755,7 +769,7 @@ def output_reader(proc):
     :return: None
     """
     for line in iter(proc.stdout.readline, b''):
-        logger.info('got line: {0}'.format(line.decode('utf-8')), end='')
+        logger.info('got line: {0}'.format(line.decode('utf-8')))
 
 
 def get_user_backtests(user_id):
@@ -883,13 +897,18 @@ def check_py_validity(file, userid):
             result.linter.stats['global_note'] <= 0:
         logger.info("wrong file, remove")
 
-        shutil.rmtree(local_strategy_folder)
-        return "Your strategy has error or is not able to run! \
-            correct your file and upload again"
+        prefix = "has error:"
+    else:
+        prefix = "successful:"
 
-    logger.info("testing file has pylint score %s",
-                result.linter.stats['global_note'])
-    return local_path
+    logger.info(prefix)
+    if "successful" in prefix:
+        logger.info("uploaded: file has pylint score %s",
+                    result.linter.stats['global_note'])
+    else:
+        logger.info("check does not pass")
+    response = prefix + local_path
+    return response
 
 
 def upload_strategy_to_s3(
@@ -961,6 +980,30 @@ def delete_strategy_by_user(filepath):
     conn.commit()
     logger.info("affected rows = %d", cursor.rowcount)
     logger.info("Delete file from Database")
+
+
+def clean_pylint_output(pylint_message):
+    """clean pylint message
+
+    Args:
+        pylint_message (pylint_message): 
+        we need to clean pylint output to give
+        a cleaner output
+    """
+    break_lines = pylint_message.split('\n')
+    clean_output = []
+    for line in break_lines:
+        clean_line = line
+        if ".py:" in line:
+            # target line
+            components = line.split(':')
+            file = components[0].split('/')[-1]
+            components[0] = file
+            clean_line = ':'.join(components)
+        clean_output.append(clean_line)
+
+    clean_message = '\n'.join(clean_output)
+    return clean_message
 
 
 # Forms: registration, login, account
@@ -1204,5 +1247,331 @@ admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
 admin.add_view(UserModelView(User, db.session))
 
 
+
+# dash layout
+def fig_update(file_path):
+    """
+    Given the file path, return an updated fig graph to display.
+    :param file_path: string, to get csv file.
+    :return: fig, the styled graph.
+    """
+
+    cr_fig, sr_rolling, pnl_hist, pnl_df = None, None, None, None
+    logger.info(file_path)
+    if file_path is not None:
+        split_path = file_path.split('/')
+        prefix = "/".join(split_path[3:])
+
+        bucket_name = application.config["S3_BUCKET"]
+        csv_obj = s3_client.get_object(Bucket=bucket_name, Key=prefix)
+        pnl_df = pd.read_csv(csv_obj['Body'])
+
+        pnl_df['cusum'] = pnl_df['pnl'].cumsum()
+        cr_fig = px.line(pnl_df, x='date', y='cusum')
+
+        cr_fig.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            )
+        )
+
+        # Rolling sharpe ratio plot
+        pnl_df['rolling_SR'] = pnl_df.pnl.rolling(180).apply(lambda x: (x.mean() - 0.02) / x.std(), raw=True)
+
+        pnl_df.fillna(0, inplace=True)
+        sr_df = pnl_df[pnl_df['rolling_SR'] > 0]
+        sr_rolling = go.Figure([go.Scatter(x=sr_df['date'], y=sr_df['rolling_SR'],
+                                           line=dict(color="DarkOrange"), mode='lines+markers')])
+
+        sr_rolling.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            )
+        )
+        mean = np.mean(sr_df['rolling_SR'])
+        avg_title = "Average value={:.3f}".format(mean)
+        sr_rolling.add_hline(y=mean, line_width=3, line_dash="dash", line_color="green",
+                             annotation_text=avg_title,
+                             annotation_position="bottom right")
+
+        # pnl histogram plot
+        pnl_hist = go.Figure()
+        profit = pnl_df[pnl_df['pnl'] > 0]
+        loss = pnl_df[pnl_df['pnl'] < 0]
+
+        pnl_hist.add_trace(go.Bar(x=profit['date'], y=loss['pnl'],
+                           marker_color='crimson',
+                           name='loss'))
+        pnl_hist.add_trace(go.Bar(x=loss['date'], y=profit['pnl'],
+                           marker_color='lightslategrey',
+                           name='profit'))
+
+    return cr_fig, sr_rolling, pnl_hist, pnl_df
+
+
+def new_plot():
+
+    content_style = {
+        "margin-left": "32rem",
+        "margin-right": "2rem",
+        "padding": "2rem 1rem",
+    }
+    global OptionList
+    contents = html.Div([
+
+        html.Div(
+            [
+                dcc.Dropdown(
+                    id='backtest_result',
+                    options=OptionList,
+                    placeholder="Select Backtest Result",
+                    style=dict(
+                        width='70%',
+                        verticalAlign="middle"
+                    ),
+
+                ),
+                html.Div(
+                    [
+                        html.A(dbc.Button("Go Back", outline=True, color="primary", className="mr-1"),
+                               href='/strategies'),
+                    ],
+                ),
+            ],
+            style=dict(display='flex')
+        ),
+
+
+        html.Div(
+            [
+                html.H1('Cumulative Return',
+                        style={'textAlign': 'center'}),
+                html.Hr(),
+                dbc.Row(
+                    [
+                        dbc.Col(dcc.Graph(id='pnl_fig'),
+                                width={"size": 8, "offset": 2}),
+                    ]
+                )
+
+            ],
+            style=content_style
+        ),
+
+        html.Div(
+            [
+                html.H1('Rolling Sharpe Ratio (6-months)',
+                        style={'textAlign': 'center'}),
+                html.Hr(),
+                dbc.Row(
+                    [
+                        dbc.Col(dcc.Graph(id='sr_rolling'),
+                                width={"size": 8, "offset": 2}),
+                    ]
+                )
+            ],
+            style=content_style
+        ),
+
+        html.Div(
+            [
+                html.H1('Profit and Loss histogram',
+                        style={'textAlign': 'center'}),
+                html.Hr(),
+                dbc.Row(
+                    [
+                        dbc.Col(dcc.Graph(id='pnl_hist'),
+                                width={"size": 8, "offset": 2}),
+                    ]
+                )
+
+            ],
+            style=content_style
+        ),
+        html.Div(id='table')
+    ])
+    return contents
+
+@dash_app.callback(
+    Output('pnl_fig', 'figure'),
+    Output('sr_rolling', 'figure'),
+    Output('pnl_hist', 'figure'),
+    Output('table', 'children'),
+    Input('backtest_result', 'value'))
+def update_graph(backtest_fp):
+    """
+    Dash callback function for update graphs depending on the chosen backtest file from dropdown bar.
+    :param backtest_fp:
+    :return:
+    """
+    table_style = {
+        "position": "fixed",
+        "top": 80,
+        "left": 0,
+        "bottom": 5,
+        "width": "30rem",
+        "padding": "2rem 1rem",
+        "background-color": "#f8f9fa",
+    }
+    if backtest_fp is not None:
+
+        pnl_fig, sr_rolling, pnl_hist, pnl_df = fig_update(backtest_fp)
+        table_df = pnl_summary(pnl_df)
+        table_comp = html.Div(
+               [
+                    html.H1('Statistic Table',
+                            style={'font_size': '80',
+                                   'text_align': 'center'}),
+                    html.Hr(),
+                    dt.DataTable(
+                        data=table_df.to_dict('records'),
+                        columns=[{'id': c, 'name': c} for c in table_df.columns],
+
+                        style_cell={'front_size': '16px'},
+                        style_cell_conditional=[
+                            {
+                                'if': {'column_id': 'Backtest'},
+                                'textAlign': 'left'
+                            },
+
+                            {
+                                'if': {'column_id': 'Category'},
+                                'textAlign': 'left'
+                            },
+
+                        ],
+                        style_data_conditional=[
+                            {
+                                'if': {'row_index': 'odd'},
+                                'backgroundColor': 'rgb(248, 248, 248)'
+                            },
+                            {
+                                'if': {'column_id': 'Category'},
+                                'fontWeight': 'bold'
+                            }
+                        ],
+                        style_header={
+                            'backgroundColor': 'rgb(230, 230, 230)',
+                            'fontWeight': 'bold'
+                        }
+                    ),
+                ], style=table_style
+        )
+        return pnl_fig, sr_rolling, pnl_hist, table_comp
+
+    else:
+        raise PreventUpdate
+
+
+def get_plot(strategy_ids):
+    """
+    Get two dictionaries, one mapping from strategy id to strategy name,
+    another is mapping from strategy id to strategy location. Update the global variables for OptionList and pnl_paths.
+    :param user_id: a list of strategy ids.
+    :return:
+    """
+    strategy_names = {}
+    id_paths = {}
+    global pnl_paths
+    if len(strategy_ids) > 0:
+        backtests = rds.get_all_locations(strategy_ids)
+        for idx, strategy_id in enumerate(strategy_ids):
+            strategy_names[strategy_id] = backtests['strategy_name'].iloc[idx]
+            id_paths[strategy_id] = backtests['pnl_location'].iloc[idx]
+
+        global OptionList
+        OptionList = [{'label': v, 'value': id_paths[k]} for k, v in strategy_names.items()]
+        pnl_paths = [id_paths[k] for k in strategy_names.keys()]
+
+
+def pnl_summary(data):
+    """
+    Statistic analysis of backtest result.
+    :param data: A dataframe including the backtest results, contains date and pnl two columns.
+    :return: A dataframe for making the table, it contains two columns,
+    category name and corresponding values.
+    """
+    data['cumulative'] = data['pnl'].cumsum()
+    result = {'Category': [], 'Value': []}
+    total_date = data.shape[0]
+    return_value = (data['cumulative'].iloc[-1]) / TOTAL_CAPITAL
+
+    num_format = "{:,}".format
+
+    # Annual return
+    annual_return = round(return_value / (total_date / 365) * 100, 2)
+    result['Category'].append('Annual Return')
+    result['Value'].append(num_format(annual_return) + '%')
+
+    # Cumulative return
+    cumulative_return = round(return_value * 100, 2)
+    result['Category'].append('Cumulative Return')
+    result['Value'].append(num_format(cumulative_return) + '%')
+
+    # Annual volatility
+    daily_change = data['pnl'].iloc[1:].div(TOTAL_CAPITAL)
+    annual_volatility = round(daily_change.std() * np.sqrt(365), 2)
+    result['Category'].append('Annual Volatility')
+    result['Value'].append(num_format(annual_volatility))
+
+    # Sharpe ratio
+    ratio_value = data['pnl'].div(TOTAL_CAPITAL)
+    sharpe_ratio = round(ratio_value.mean() / ratio_value.std() * np.sqrt(365), 2)
+    result['Category'].append('Sharpe Ratio')
+    result['Value'].append(num_format(sharpe_ratio))
+
+    # Max Dropdown
+    max_drop = round((np.max(data['pnl']) - np.min(data['pnl'])) / np.max(data['pnl']), 2)
+    result['Category'].append('Max Dropdown')
+    result['Value'].append(num_format(max_drop))
+
+    # Skew
+    skew = round(data['pnl'].skew(), 2)
+    result['Category'].append('Skew')
+    result['Value'].append(num_format(skew))
+
+    # Kurtosis
+    kurtosis = round(data['pnl'].kurtosis(), 2)
+    result['Category'].append('Kurtosis')
+    result['Value'].append(num_format(kurtosis))
+
+    return pd.DataFrame(result)
+
+
+def update_layout(user_id):
+    """
+    Get all the valid backtes results and given the corresponding stratefy ids to dash.
+    :param user_id: current user_id
+    :return: None
+    """
+    all_ids = list(rds.get_all_backtests(user_id)['strategy_id'])
+    all_strategy_ids = [str(id) for id in all_ids]
+    if len(all_strategy_ids) > 0:
+        get_plot(all_strategy_ids)
+    get_plot([])
+
+
 if __name__ == "__main__":
-    application.run(debug=True, threaded=True, ssl_context="adhoc", port='5000')
+    application.debug = True
+
+    dash_app.layout = new_plot
+
+    app_embeds = DispatcherMiddleware(application, {
+        '/dash_plot': dash_app.server
+    })
+
+    run_simple('localhost', 5000, app_embeds, use_reloader=True, use_debugger=True, ssl_context="adhoc")
