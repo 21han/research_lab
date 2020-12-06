@@ -16,15 +16,35 @@ from dash.dependencies import Input, Output, State
 from utils import s3_util, rds
 from config import S3_BUCKET
 import base64
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+import flask
+from werkzeug.serving import run_simple
 
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 BUCKET_NAME = S3_BUCKET
 
-dash_app = Dash(__name__)
-dash_app.layout = html.Div()
+application = flask.Flask(__name__)
+dash_app = Dash(__name__, server=application, url_base_pathname='/plots/')
+
+# dash_app = Dash(__name__)
 
 TOTAL_CAPITAL = 10 ** 6
+
+
+@application.route('/')
+@application.route('/hello')
+def hello():
+    return 'hello world!'
+
+
+@application.route('/plots/')
+def render_reports():
+    """
+    Redirect to dosh route for visualization.
+    :return:
+    """
+    return flask.redirect('/dash_plot')
 
 
 def fig_update(file_path):
@@ -267,20 +287,173 @@ def construct_plot(strategy_names, pnl_paths):
     return html.Div([dcc.Tabs(contents, style=tabs_styles)])
 
 
+def new_plot():
+
+    content_style = {
+        "margin-left": "32rem",
+        "margin-right": "2rem",
+        "padding": "2rem 1rem",
+    }
+
+    contents = html.Div([
+
+        html.Div(
+            [
+                dcc.Dropdown(
+                    id='backtest_result',
+                    options=OptionList,
+                    value='test new plot',
+                    placeholder="Select Backtest Result",
+                    style=dict(
+                        width='70%',
+                        verticalAlign="middle"
+                    ),
+
+                ),
+                html.Div(
+                    [
+                        html.A(dbc.Button("Go to homepage", outline=True, color="primary", className="mr-1"),
+                               href='/hello'),
+                    ],
+                ),
+            ],
+            style=dict(display='flex')
+        ),
+
+
+        html.Div(
+            [
+                html.H1('Cumulative Return',
+                        style={'textAlign': 'center'}),
+                html.Hr(),
+                dbc.Row(
+                    [
+                        dbc.Col(dcc.Graph(id='pnl_fig'),
+                                width={"size": 8, "offset": 2}),
+                    ]
+                )
+
+            ],
+            style=content_style
+        ),
+
+        html.Div(
+            [
+                html.H1('Rolling Sharpe Ratio (6-months)',
+                        style={'textAlign': 'center'}),
+                html.Hr(),
+                dbc.Row(
+                    [
+                        dbc.Col(dcc.Graph(id='sr_rolling'),
+                                width={"size": 8, "offset": 2}),
+                    ]
+                )
+            ],
+            style=content_style
+        ),
+
+        html.Div(
+            [
+                html.H1('Profit and Loss histogram',
+                        style={'textAlign': 'center'}),
+                html.Hr(),
+                dbc.Row(
+                    [
+                        dbc.Col(dcc.Graph(id='pnl_hist'),
+                                width={"size": 8, "offset": 2}),
+                    ]
+                )
+
+            ],
+            style=content_style
+        ),
+        html.Div(id='table')
+    ])
+    return contents
+
+
+@dash_app.callback(
+    Output('pnl_fig', 'figure'),
+    Output('sr_rolling', 'figure'),
+    Output('pnl_hist', 'figure'),
+    Output('table', 'children'),
+    Input('backtest_result', 'value'))
+def update_graph(backtest_fp):
+
+    table_style = {
+        "position": "fixed",
+        "top": 80,
+        "left": 0,
+        "bottom": 5,
+        "width": "30rem",
+        "padding": "2rem 1rem",
+        "background-color": "#f8f9fa",
+    }
+    pnl_fig, sr_rolling, pnl_hist, table_comp = None, None, None, None
+    if backtest_fp is not None:
+        pnl_fig, sr_rolling, pnl_hist, pnl_df = fig_update(backtest_fp)
+        table_df = pnl_summary(pnl_df)
+        table_comp = html.Div(
+            [
+                html.H1('Statistic Table',
+                        style={'font_size': '80',
+                               'text_align': 'center'}),
+                html.Hr(),
+                dt.DataTable(
+                    data=table_df.to_dict('records'),
+                    columns=[{'id': c, 'name': c} for c in table_df.columns],
+
+                    style_cell={'front_size': '16px'},
+                    style_cell_conditional=[
+                        {
+                            'if': {'column_id': 'Backtest'},
+                            'textAlign': 'left'
+                        },
+
+                        {
+                            'if': {'column_id': 'Category'},
+                            'textAlign': 'left'
+                        },
+
+                    ],
+                    style_data_conditional=[
+                        {
+                            'if': {'row_index': 'odd'},
+                            'backgroundColor': 'rgb(248, 248, 248)'
+                        },
+                        {
+                            'if': {'column_id': 'Category'},
+                            'fontWeight': 'bold'
+                        }
+                    ],
+                    style_header={
+                        'backgroundColor': 'rgb(230, 230, 230)',
+                        'fontWeight': 'bold'
+                    }
+                ),
+            ], style = table_style
+        )
+    return pnl_fig, sr_rolling, pnl_hist, table_comp
+
+
 def get_plot(strategy_ids):
     """
     Get two dictionaries, one mapping from strategy id to strategy name,
     another is mapping from strategy id to strategy location. And then construct dash plot.
     :return:
     """
-    backtests = rds.get_all_locations(strategy_ids)
     strategy_names = {}
     pnl_paths = {}
-    for idx, strategy_id in enumerate(strategy_ids):
-        strategy_names[strategy_id] = backtests['strategy_name'].iloc[idx]
-        pnl_paths[strategy_id] = backtests['pnl_location'].iloc[idx]
+    if len(strategy_ids) > 0:
+        backtests = rds.get_all_locations(strategy_ids)
 
-    dash_app.layout = construct_plot(strategy_names, pnl_paths)
+        for idx, strategy_id in enumerate(strategy_ids):
+            strategy_names[strategy_id] = backtests['strategy_name'].iloc[idx]
+            pnl_paths[strategy_id] = backtests['pnl_location'].iloc[idx]
+    global OptionList
+    OptionList = [{'label': v, 'value': pnl_paths[k]} for k, v in strategy_names.items()]
+    # return construct_plot(strategy_names, pnl_paths)
+    return new_plot()
 
 
 def pnl_summary(data):
@@ -350,5 +523,23 @@ def call_dash(*args):
     dash_app.run_server(host='0.0.0.0', port=port_num, debug=False, threaded=True)
 
 
+def get_layout(user_id):
+
+    all_ids = list(rds.get_all_backtests(user_id)['strategy_id'])
+    all_strategy_ids = [str(id) for id in all_ids]
+    print('user_id', user_id)
+    if len(all_strategy_ids) > 0:
+        return get_plot(all_strategy_ids)
+    else:
+        return get_plot([])
+
+
+dash_app.layout = get_layout(user_id)
+app_embeds = DispatcherMiddleware(application, {
+    '/dash_plot': dash_app.server
+})
+
+
 if __name__ == "__main__":
-    call_dash(sys.argv)
+    # call_dash(sys.argv)
+    run_simple('0.0.0.0', 5000, app_embeds, use_reloader=True, use_debugger=True)
