@@ -35,7 +35,6 @@ def test_s3_resource_connection():
     s3_resource = s3_util.init_s3()
     assert s3_resource.Bucket(S3_BUCKET) in s3_resource.buckets.all()
 
-
 def test_mock_data_basics():
     """
     test mock data has

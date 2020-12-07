@@ -752,15 +752,6 @@ If you did not make this request then simply ignore this email and no changes wi
 
 
 # helper functions
-def output_reader(proc):
-    """
-    Check if subprocess works correctly.
-    :param proc: process
-    :return: None
-    """
-    for line in iter(proc.stdout.readline, b''):
-        logger.info('got line: {0}'.format(line.decode('utf-8')))
-
 
 def get_user_backtests(user_id):
     """
@@ -1238,7 +1229,7 @@ admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
 admin.add_view(UserModelView(User, db.session))
 
 
-# dash layout
+# dash part
 def fig_update(file_path):
     """
     Given the file path, return an updated fig graph to display.
@@ -1470,8 +1461,8 @@ def get_plot(strategy_ids):
     """
     Get two dictionaries, one mapping from strategy id to strategy name,
     another is mapping from strategy id to strategy location. Update the global variables for OptionList and pnl_paths.
-    :param user_id: a list of strategy ids.
-    :return:
+    :param strategy_ids: a list of strategy ids.
+    :return: True if the global variable pnl_paths and OptionList updated, otherwise False
     """
     strategy_names = {}
     id_paths = {}
@@ -1485,6 +1476,9 @@ def get_plot(strategy_ids):
         global OptionList
         OptionList = [{'label': v, 'value': id_paths[k]} for k, v in strategy_names.items()]
         pnl_paths = [id_paths[k] for k in strategy_names.keys()]
+        return True
+
+    return False
 
 
 def pnl_summary(data):
@@ -1545,13 +1539,15 @@ def update_layout(user_id):
     """
     Get all the valid backtes results and given the corresponding stratefy ids to dash.
     :param user_id: current user_id
-    :return: None
+    :return: True if the user has backtest results, otherwise False.
     """
     all_ids = list(rds.get_all_backtests(user_id)['strategy_id'])
     all_strategy_ids = [str(id) for id in all_ids]
     if len(all_strategy_ids) > 0:
         get_plot(all_strategy_ids)
+        return True
     get_plot([])
+    return False
 
 
 if __name__ == "__main__":
