@@ -2,12 +2,14 @@
 this is the test for helper function in application.py
 """
 
-import application as app
 import os
+
 import pytest
-from utils import s3_util
-from config import S3_LOCATION, S3_BUCKET
 from boto3.exceptions import S3UploadFailedError
+from pymysql.err import IntegrityError
+import application as app
+from config import S3_LOCATION, S3_BUCKET
+from utils import s3_util
 
 
 def test_get_strategies():
@@ -62,7 +64,7 @@ def test_upload_and_delete_strategy():
         "tests/uploads/helpers.py",
         S3_BUCKET,
         prefix
-        )
+    )
     assert location == os.path.join(S3_LOCATION, prefix, 'helpers.py')
 
     # delete
@@ -88,13 +90,13 @@ def test_compute_pnl():
     assert app.compute_pnl(
         {'BTC': 0.2, 'ETH': 0.8},
         {'BTC': 9, 'ETH': 1.5},
-        {'BTC': 10, 'ETH': 2}, 100) == (100*0.2/9)*10+(100*0.8/1.5)*2-100
+        {'BTC': 10, 'ETH': 2}, 100) == (100 * 0.2 / 9) * 10 + (100 * 0.8 / 1.5) * 2 - 100
 
     # case 3: case we made loss
     assert app.compute_pnl(
         {'BTC': 0.2, 'ETH': 0.8},
         {'BTC': 10, 'ETH': 2},
-        {'BTC': 9, 'ETH': 1.5}, 100) == (100*0.2/10)*9+(100*0.8/2)*1.5-100
+        {'BTC': 9, 'ETH': 1.5}, 100) == (100 * 0.2 / 10) * 9 + (100 * 0.8 / 2) * 1.5 - 100
 
 
 def test_clean_pylint():
@@ -117,3 +119,26 @@ def test_clean_pylint():
     clean_message = app.clean_pylint_output(pylint_message)
     assert "strategies/2/strategy2/" not in clean_message, \
         "do not clean the pylint output!"
+
+
+def test_persist_to_s3():
+    """
+    test persist to s3
+    :return:
+    """
+    test_user = 0
+    pnl_df = {'test': [1, 2, 3]}
+    test_strategy_id = 0
+    assert app.persist_to_s3(pnl_df, test_user, test_strategy_id) == f"{test_user}/backtest_{test_strategy_id}.csv"
+
+
+def test_update_backtest_db_integrity_error():
+    """
+    test update backtest db
+    :return:
+    """
+    test_strategy_id = -1
+    test_bucket = None
+    test_key = None
+    with pytest.raises(IntegrityError):
+        app.update_backtest_db(test_strategy_id, test_bucket, test_key)
