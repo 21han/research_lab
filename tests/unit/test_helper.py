@@ -121,10 +121,24 @@ def test_clean_pylint():
         "do not clean the pylint output!"
 
 
-def test_get_backtest():
+def test_persist_to_s3():
     """
-    get_user_strategies(user_id)
-    NOTE: user_id 0 should be fixed
+    test persist to s3
+    :return:
     """
-    strategies = app.get_user_backtests(0)
-    assert len(strategies.columns) > 0 and len(strategies.values) > 0
+    test_user = 0
+    pnl_df = {'test': [1, 2, 3]}
+    test_strategy_id = 0
+    assert app.persist_to_s3(pnl_df, test_user, test_strategy_id) == f"{test_user}/backtest_{test_strategy_id}.csv"
+
+
+def test_update_backtest_db_integrity_error():
+    """
+    test update backtest db
+    :return:
+    """
+    test_strategy_id = -1
+    test_bucket = None
+    test_key = None
+    with pytest.raises(IntegrityError):
+        app.update_backtest_db(test_strategy_id, test_bucket, test_key)
