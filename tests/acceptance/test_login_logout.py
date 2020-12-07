@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from .test_baseclass import TestBase
 from utils import rds
+import os
 
 class TestLoginLogout(TestBase):
     """
@@ -76,9 +77,10 @@ class TestLoginLogout(TestBase):
         """login test users"""
         response = self.app.post(
             "/login",
+
             data={
-                "email": "admin@admin.com",
-                "password": "admin"},
+                "email": os.getenv('ADMIN_EMAIL'),
+                "password": os.getenv('ADMIN_PASSWORD')}
         )
 
         self.assertEqual(response.status_code, 302,

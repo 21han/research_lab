@@ -3,7 +3,7 @@
 """
 from urllib.parse import urlparse
 from .test_baseclass import TestBase
-
+import os
 
 class TestAdmin(TestBase):
     """
@@ -23,8 +23,10 @@ class TestAdmin(TestBase):
         response = self.app.post(
             "/login",
             data={
-                "email": "admin@admin.com",
-                "password": "admin"},
+                "email": os.getenv('ADMIN_EMAIL'),
+                "password": os.getenv('ADMIN_PASSWORD')
+
+            },
         )
 
         response = self.app.get("/admin")
