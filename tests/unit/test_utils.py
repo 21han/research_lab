@@ -141,3 +141,6 @@ def test_s3_url():
     s3 = s3_util.S3Url("s3://bucket/hello/world#foo?bar=2")
     assert(s3.key == 'hello/world#foo?bar=2')
     assert(s3.url == 's3://bucket/hello/world#foo?bar=2')
+
+
+

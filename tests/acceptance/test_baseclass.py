@@ -6,7 +6,6 @@ alchemist
 """
 
 import unittest
-# import sh
 from application import application
 
 
@@ -14,6 +13,7 @@ class TestBase(unittest.TestCase):
     """
     Test Base
     """
+
     def setUp(self):
         """
         start application test client,
@@ -34,10 +34,9 @@ class TestBase(unittest.TestCase):
             },
         )
 
-
     def tearDown(self):
         """
-        somethin to restore
+        something to restore
         like reset db if necessary
         """
         self.app_context.pop()

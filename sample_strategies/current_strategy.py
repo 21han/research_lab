@@ -56,5 +56,5 @@ class Strategy:
         mk_data = mock_historical_data.MockData
         prices = {}
         for ticker in Strategy.trading_universe:
-            prices[ticker]: mk_data.get_price(datetime.datetime.now(), ticker)
+            prices[ticker] = mk_data.get_price(datetime.datetime.now(), ticker)
         return prices

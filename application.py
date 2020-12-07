@@ -74,7 +74,6 @@ login_manager.login_message_category = 'info'
 # create an s3 client
 s3_client = s3_util.init_s3_client()
 
-
 # email for send reset password token
 mail = Mail(application)
 
@@ -93,6 +92,7 @@ dash_app._layout = html.Div()
 OptionList = []
 pnl_paths = []
 TOTAL_CAPITAL = 10 ** 6
+
 
 # endpoint routes
 
@@ -370,7 +370,6 @@ def upload_strategy():
 
     conn.commit()
 
-
     # remove the local file
     shutil.rmtree(local_prefix)
 
@@ -595,12 +594,12 @@ def backtest_progress():
             if day_x % one_tenth == 0:
                 time.sleep(1)
             progress = {0: min(100 * day_x // n_days_back, 100)}
-            ret_string = f"data:{json.dumps(progress)}\n\n"
-            yield ret_string
             trades.append({'price': current_strategy.get_price(), 'position': current_strategy.get_position()})
             total_value_x = compute_pnl(trades[0].get('position'), trades[0].get('price'),
                                         trades[1].get('price'), strategy_cap)
             pnl_df['pnl'].append(total_value_x)
+            ret_string = f"data:{json.dumps(progress)}\n\n"
+            yield ret_string
 
         yield f"data:{json.dumps({0: 100})}\n\n"
         pnl_df['date'] = past_n_days
@@ -620,7 +619,10 @@ def persist_to_s3(pnl_df, current_usr, strategy_id):
     """
     pnl_df = pd.DataFrame(pnl_df)
     file_name = f'strategies/user_id_{current_usr}/backtest.csv'
-    pnl_df.to_csv(file_name, index=True)
+    try:
+        pnl_df.to_csv(file_name, index=True)
+    except Exception as e_msg:
+        logger.info(e_msg)
     key = f"{current_usr}/backtest_{strategy_id}.csv"
     _s3_client = s3_util.init_s3_client()
     _s3_client.upload_file(file_name, application.config["S3_BUCKET"], key)
@@ -660,7 +662,7 @@ def compute_pnl(previous_day_position, prev_day_price, current_day_price, init_c
     """
     pnl = 0
     total_positions_usd = 0
-    if previous_day_position is None:
+    if previous_day_position is None or prev_day_price is None:
         return pnl
     for ticker, percent in previous_day_position.items():
         ticker_quantity = init_cap * percent / prev_day_price[ticker]
@@ -757,9 +759,8 @@ def get_user_backtests(user_id):
     :param user_id: user id
     :return: dataframe
     """
-    backtests = rds.get_all_backtests(user_id)
-
-    return backtests
+    back_tests = rds.get_all_backtests(user_id)
+    return back_tests
 
 
 def save_picture(form_picture):
@@ -1174,6 +1175,7 @@ class UserModelView(ModelView):
     """
     User view
     """
+
     def is_accessible(self):
         """
         check if user can access admin page
@@ -1195,6 +1197,7 @@ class HomePageView(BaseView):
     """
     Home page view
     """
+
     @expose('/')
     def index(self):
         """
@@ -1212,7 +1215,7 @@ class HomePageView(BaseView):
 
     def inaccessible_callback(self, name, **kwargs):
         """
-        Non admin user cannot accees this page
+        Non admin user cannot access this page
         :param name:
         :param kwargs:
         :return: redirect to login
@@ -1292,17 +1295,16 @@ def fig_update(file_path):
         loss = pnl_df[pnl_df['pnl'] < 0]
 
         pnl_hist.add_trace(go.Bar(x=profit['date'], y=loss['pnl'],
-                           marker_color='crimson',
-                           name='loss'))
+                                  marker_color='crimson',
+                                  name='loss'))
         pnl_hist.add_trace(go.Bar(x=loss['date'], y=profit['pnl'],
-                           marker_color='lightslategrey',
-                           name='profit'))
+                                  marker_color='lightslategrey',
+                                  name='profit'))
 
     return cr_fig, sr_rolling, pnl_hist, pnl_df
 
 
 def new_plot():
-
     content_style = {
         "margin-left": "32rem",
         "margin-right": "2rem",
@@ -1332,7 +1334,6 @@ def new_plot():
             ],
             style=dict(display='flex')
         ),
-
 
         html.Div(
             [
@@ -1384,6 +1385,7 @@ def new_plot():
     ])
     return contents
 
+
 @dash_app.callback(
     Output('pnl_fig', 'figure'),
     Output('sr_rolling', 'figure'),
@@ -1410,44 +1412,44 @@ def update_graph(backtest_fp):
         pnl_fig, sr_rolling, pnl_hist, pnl_df = fig_update(backtest_fp)
         table_df = pnl_summary(pnl_df)
         table_comp = html.Div(
-               [
-                    html.H1('Statistic Table',
-                            style={'font_size': '80',
-                                   'text_align': 'center'}),
-                    html.Hr(),
-                    dt.DataTable(
-                        data=table_df.to_dict('records'),
-                        columns=[{'id': c, 'name': c} for c in table_df.columns],
+            [
+                html.H1('Statistic Table',
+                        style={'font_size': '80',
+                               'text_align': 'center'}),
+                html.Hr(),
+                dt.DataTable(
+                    data=table_df.to_dict('records'),
+                    columns=[{'id': c, 'name': c} for c in table_df.columns],
 
-                        style_cell={'front_size': '16px'},
-                        style_cell_conditional=[
-                            {
-                                'if': {'column_id': 'Backtest'},
-                                'textAlign': 'left'
-                            },
+                    style_cell={'front_size': '16px'},
+                    style_cell_conditional=[
+                        {
+                            'if': {'column_id': 'Backtest'},
+                            'textAlign': 'left'
+                        },
 
-                            {
-                                'if': {'column_id': 'Category'},
-                                'textAlign': 'left'
-                            },
+                        {
+                            'if': {'column_id': 'Category'},
+                            'textAlign': 'left'
+                        },
 
-                        ],
-                        style_data_conditional=[
-                            {
-                                'if': {'row_index': 'odd'},
-                                'backgroundColor': 'rgb(248, 248, 248)'
-                            },
-                            {
-                                'if': {'column_id': 'Category'},
-                                'fontWeight': 'bold'
-                            }
-                        ],
-                        style_header={
-                            'backgroundColor': 'rgb(230, 230, 230)',
+                    ],
+                    style_data_conditional=[
+                        {
+                            'if': {'row_index': 'odd'},
+                            'backgroundColor': 'rgb(248, 248, 248)'
+                        },
+                        {
+                            'if': {'column_id': 'Category'},
                             'fontWeight': 'bold'
                         }
-                    ),
-                ], style=table_style
+                    ],
+                    style_header={
+                        'backgroundColor': 'rgb(230, 230, 230)',
+                        'fontWeight': 'bold'
+                    }
+                ),
+            ], style=table_style
         )
         return pnl_fig, sr_rolling, pnl_hist, table_comp
 
