@@ -59,6 +59,40 @@ class TestLoginLogout(TestBase):
             "Redirect location is not /home"
         )
 
+    def test_login_fail(self):
+        """login test users"""
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "wrong"},
+        )
+
+        self.assertEqual(response.status_code, 200,
+                         "Able to login for the test user with wrong password")
+
+
+    def test_admin_login(self):
+        """login test users"""
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "admin@admin.com",
+                "password": "admin"},
+        )
+
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the admin user")
+
+        parsed_url = urlparse(response.location)
+        path = parsed_url.path
+
+        # right now, home is redirected to upload page
+        self.assertEqual(
+            path, "/admin",
+            "Redirect location is not /admin"
+        )
+
     def test_logout(self):
         """logout test user"""
         response = self.app.post(
