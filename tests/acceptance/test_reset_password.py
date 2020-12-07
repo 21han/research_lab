@@ -38,3 +38,12 @@ class TestResetPassword(TestBase):
             path, "/login",
             "Redirect location is not /login"
         )
+
+    def test_reset_password_invalid_token(self):
+        """
+        GET /reset_password redirects to /reset_password page when user click forget password tab
+
+        """
+        response = self.app.get("/reset_password/random_token")
+        self.assertEqual(response.status_code, 302,
+                         "/ did not redirect to reset page")

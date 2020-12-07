@@ -4,7 +4,7 @@
 from urllib.parse import urlparse
 
 from .test_baseclass import TestBase
-
+from utils import rds
 
 class TestLoginLogout(TestBase):
     """
@@ -69,7 +69,7 @@ class TestLoginLogout(TestBase):
         )
 
         self.assertEqual(response.status_code, 200,
-                         "Able to login for the test user with wrong password")
+                         "Can login the test user with wrong password")
 
 
     def test_admin_login(self):
@@ -93,6 +93,30 @@ class TestLoginLogout(TestBase):
             "Redirect location is not /admin"
         )
 
+    def test_persiste_login(self):
+        """login test users"""
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
+        )
+
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the test user")
+
+        response = self.app.get("/login")
+        self.assertEqual(response.status_code, 302,
+                         "/ did not redirect to login when user\
+                          is not logged in")
+
+        parsed_url = urlparse(response.location)
+        path = parsed_url.path
+        self.assertEqual(
+            path, "/home",
+            "Redirect location is not /home"
+        )
+
     def test_logout(self):
         """logout test user"""
         response = self.app.post(
@@ -112,3 +136,44 @@ class TestLoginLogout(TestBase):
                 302,
                 "not able to logout"
         )
+
+    def test_login_without_approve(self):
+        response = self.app.post(
+            "/register",
+            data={
+                "username": "not_approve",
+                "email": "need@approve.com",
+                "password": "000",
+                "confirm_password": "000"
+            },
+        )
+
+        self.assertEqual(response.status_code, 302,
+                        "Unable to register for the test user")
+
+        parsed_url = urlparse(response.location)
+        path = parsed_url.path
+
+        self.assertEqual(
+            path, "/login",
+            "Redirect location is not /login"
+        )
+
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "need@approve.com",
+                "password": "000"},
+        )
+
+        conn = rds.get_connection()
+        cursor = conn.cursor()
+        query = "delete from backtest.user where username = 'not_approve';"
+        cursor.execute(
+            query
+        )
+        conn.commit()
+
+        self.assertEqual(response.status_code, 200,
+                         "can login for the unapproved user")
+
