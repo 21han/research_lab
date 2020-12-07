@@ -73,7 +73,8 @@ def test_sharpe_ratio():
     std = np.std(cum_shift, ddof=1)
     mean = cum_shift.mean()
     result = app.pnl_summary(data)
-    sr = str(round(mean / std * np.sqrt(365), 2) )
+    # round to 2 decimals to be consistent
+    sr = str(round(mean / std * np.sqrt(365), 2))
     assert sr == result['Value'].iloc[3]
 
 
@@ -88,6 +89,7 @@ def test_max_dropdown():
 
     result = app.pnl_summary(data)
     md = str((1000 - (-1500)) / np.max(data['pnl']))
+    # 4th value is dropdown
     assert md == result['Value'].iloc[4]
 
 
@@ -102,6 +104,7 @@ def test_skew():
 
     result = app.pnl_summary(data)
     sk = str(round(data['pnl'].skew(), 2))
+    # 5th value is skew
     assert sk == result['Value'].iloc[5]
 
 
@@ -116,6 +119,7 @@ def test_kurtosis():
 
     result = app.pnl_summary(data)
     kui = str(round(data['pnl'].kurtosis(), 2))
+    # 6th value is kurtosis
     assert kui == result['Value'].iloc[6]
 
 
