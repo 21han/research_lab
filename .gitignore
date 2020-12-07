@@ -2,6 +2,7 @@ bin/
 env/ 
 .idea/
 __pycache__/
+.DS_Store
 
 # cred file
 .cred
@@ -16,6 +17,10 @@ strategies/
 # ipy file for testing
 *.ipynb*
 
+# coverage html
+htmlcov/*
+
 .coverage
+.coveragerc
 *,cover
 

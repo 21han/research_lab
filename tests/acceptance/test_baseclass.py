@@ -24,6 +24,16 @@ class TestBase(unittest.TestCase):
         self.app = application.test_client()
         self.app_context = application.app_context()
         self.app_context.push()
+        self.app.post(
+            "/register",
+            data={
+                "username": "testuser",
+                "email": "testuser@testuser.com",
+                "password": "testuser",
+                "confirm_password": "testuser"
+            },
+        )
+
 
     def tearDown(self):
         """

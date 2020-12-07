@@ -16,8 +16,6 @@ class OAuthUser(UserMixin):
         self.username = username
         self.email = email
         self.image_file = image_file
-
-
     @staticmethod
     def get(user_id):
         """
