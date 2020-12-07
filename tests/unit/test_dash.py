@@ -8,6 +8,10 @@ import application as app
 import dash_html_components as html
 import plotly.graph_objects as go
 import plotly.express as px
+import boto3
+from utils import s3_util, rds
+
+s3 = s3_util.init_s3_client()
 
 TOTAL_CAPITAL = 10 ** 6
 
@@ -163,19 +167,20 @@ def test_get_plot_invalid():
     assert not result
 
 
-def update_layout():
+def test_update_layout():
     """
     Test update_layout with valid user id 0.
     :return:
     """
-    result = update_layout(0)
+    result = app.update_layout(0)
     assert result
 
 
-def update_layout_invalid():
+def test_update_layout_invalid():
     """
-    Test update_layout with invalid user id -1.
+    Test update_layout with invalid user id -1. We will never has negative user id.
     :return:
     """
-    result = update_layout(-1)
+
+    result = app.update_layout(-1)
     assert not result

@@ -112,4 +112,4 @@ def test_get_backtest():
     NOTE: user_id 0 should be fixed
     """
     strategies = app.get_user_backtests(0)
-    assert len(strategies.columns) > 0 and len(strategies.rows) > 0
+    assert len(strategies.columns) > 0 and len(strategies.values) > 0
