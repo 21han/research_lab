@@ -1199,7 +1199,7 @@ class UserModelView(ModelView):
         :param kwargs:
         :return: 403 error page
         """
-        return self.render('errors/403.html')
+        return self.render('errors/308.html')
 
 
 class HomePageView(BaseView):
