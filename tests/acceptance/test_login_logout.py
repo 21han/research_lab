@@ -138,6 +138,10 @@ class TestLoginLogout(TestBase):
         )
 
     def test_login_without_approve(self):
+        """
+        test user login without admin approved
+        :return:
+        """
         response = self.app.post(
             "/register",
             data={
