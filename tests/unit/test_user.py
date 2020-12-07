@@ -19,6 +19,7 @@ def test_Oauth_user():
     user.create("123456", "test_user", "test_email", "default.img")
     assert user.get_id() == "123456"
 
+
 def test_create_Oauth_user():
     """
     create user
