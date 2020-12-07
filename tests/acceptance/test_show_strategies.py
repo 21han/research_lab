@@ -2,7 +2,7 @@
 /login
 """
 from .test_baseclass import TestBase
-import logging
+
 
 class TestStrategies(TestBase):
     """
@@ -50,5 +50,6 @@ class TestStrategies(TestBase):
         :return:
         """
         self.login()
+        self.app.get("/strategy?id=371")
         resp = self.app.get("/backtest_progress?id=371")
         self.assertEqual(resp.status_code, 200)

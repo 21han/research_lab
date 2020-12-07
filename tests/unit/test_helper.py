@@ -129,7 +129,8 @@ def test_persist_to_s3():
     test_user = 0
     pnl_df = {'test': [1, 2, 3]}
     test_strategy_id = 0
-    assert app.persist_to_s3(pnl_df, test_user, test_strategy_id) == f"{test_user}/backtest_{test_strategy_id}.csv"
+    with pytest.raises(FileNotFoundError):
+        app.persist_to_s3(pnl_df, test_user, test_strategy_id)
 
 
 def test_update_backtest_db_integrity_error():
