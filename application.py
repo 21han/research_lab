@@ -1562,7 +1562,7 @@ if __name__ == "__main__":
     application.debug = True
 
     dash_app.layout = new_plot
-
+    dash_app.title = 'Visualization'
     app_embeds = DispatcherMiddleware(application, {
         '/dash_plot': dash_app.server
     })
