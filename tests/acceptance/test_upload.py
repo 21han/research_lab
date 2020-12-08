@@ -15,12 +15,8 @@ class TestUpload(TestBase):
     """
     TestUpload
     """
-    def test_can_access_upload_page(self):
-        """
-        User story:
-        User should be able to upload strategy: go to /upload
-        endpoint
-        """
+
+    def login(self):
         response = self.app.post(
             "/login",
             data={
@@ -30,11 +26,18 @@ class TestUpload(TestBase):
         self.assertEqual(response.status_code, 302,
                          "Unable to login for the test user")
 
+    def test_can_access_upload_page(self):
+        """
+        User story:
+        User should be able to upload strategy: go to /upload
+        endpoint
+        """
+        self.login()
         response = self.app.get(
             "/upload"
         )
         self.assertIn(b"Upload Your File", response.data,
-                      "cannot get to /upload endpoint")        
+                      "cannot get to /upload endpoint")
 
     def test_upload_valid_strategy_and_delete(self):
         """
@@ -48,15 +51,7 @@ class TestUpload(TestBase):
         Investment professionals should be able to delete any strategies/data/results they don’t want anymore.
         '
         """
-        response = self.app.post(
-            "/login",
-            data={
-                "email": "testuser@testuser.com",
-                "password": "testuser"},
-        )
-        self.assertEqual(response.status_code, 302,
-                         "Unable to login for the test user")
-
+        self.login()
         data = {'strategy_name': 'strategy'}
         with open('tests/uploads/helpers.py', 'rb') as fh:
             buf = io.BytesIO(fh.read())
@@ -84,9 +79,9 @@ class TestUpload(TestBase):
 
         if not created:
             assert False, "there is no available spots to create test file"
-        
+
         response = self.app.post(
-            "/upload?test_id="+str(test_id),
+            "/upload?test_id=" + str(test_id),
             data=data,
         )
 
@@ -94,7 +89,7 @@ class TestUpload(TestBase):
                          "User cannot upload a valid file")
         self.assertIn(b"successfully", response.data,
                       "file upload is not shown as successful")
-        
+
         s3_loc = "s3://coms4156-strategies/11/strategy" + str(test_id) + '/helpers.py'
         conn = rds.get_connection()
         strategies = pd.read_sql(
@@ -119,17 +114,8 @@ class TestUpload(TestBase):
         Investment professionals can’t upload invalid strategies and empty data/invalid data files.
         '
         """
-        response = self.app.post(
-            "/login",
-            data={
-                "email": "testuser@testuser.com",
-                "password": "testuser"},
-        )
-        self.assertEqual(response.status_code, 302,
-                         "Unable to login for the test user")
-
-        data = {'strategy_name': 'strategy'}
-        data['user_file'] = (io.BytesIO(b"invalid file"), 'helpers.py')
+        self.login()
+        data = {'strategy_name': 'strategy', 'user_file': (io.BytesIO(b"invalid file"), 'helpers.py')}
         response = self.app.post(
             "/upload",
             data=data,
@@ -144,15 +130,7 @@ class TestUpload(TestBase):
         """
         The test strategy name is not there
         """
-        response = self.app.post(
-            "/login",
-            data={
-                "email": "testuser@testuser.com",
-                "password": "testuser"},
-        )
-        self.assertEqual(response.status_code, 302,
-                         "Unable to login for the test user")
-
+        self.login()
         data = {}  # no strategy name
         with open('tests/uploads/helpers.py', 'rb') as fh:
             buf = io.BytesIO(fh.read())
@@ -165,6 +143,55 @@ class TestUpload(TestBase):
         self.assertIn(b"No strategy name specified", response.data,
                       "cannot check no strategy_name field")
 
+    def test_upload_long_strategy_name(self):
+        """
+        The test strategy name is too long
+        """
+        self.login()
+        data = {'strategy_name': 'a' * 50}
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+
+        self.assertIn(b"Strategy name should not be greater than 50 characters", response.data,
+                      "cannot detect long name")
+
+    def test_upload_normal_length_strategy_name(self):
+        """
+        The test strategy name is too long
+        """
+        self.login()
+        data = {'strategy_name': 'a' * 30}
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+        self.assertEqual(response.status_code, 200, "uploaded valid strategy")
+
+    def test_upload_very_long_strategy_name(self):
+        """
+        The test strategy name is too long
+        """
+        self.login()
+        data = {'strategy_name': 'a' * 100}
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+
+        self.assertIn(b"Strategy name should not be greater than 50 characters", response.data,
+                      "cannot detect very long name")
+
     def test_upload_empty_file(self):
         """
         special case 1: empty file
@@ -174,15 +201,7 @@ class TestUpload(TestBase):
         Investment professionals can’t upload invalid strategies and empty data/invalid data files.   
         '
         """
-        response = self.app.post(
-            "/login",
-            data={
-                "email": "testuser@testuser.com",
-                "password": "testuser"},
-        )
-        self.assertEqual(response.status_code, 302,
-                         "Unable to login for the test user")
-
+        self.login()
         data = {'strategy_name': 'strategy'}
         with open('tests/uploads/helpers.py', 'rb') as fh:
             buf = io.BytesIO(fh.read())
@@ -201,15 +220,7 @@ class TestUpload(TestBase):
         """
         user cannot upload a data without file
         """
-        response = self.app.post(
-            "/login",
-            data={
-                "email": "testuser@testuser.com",
-                "password": "testuser"},
-        )
-        self.assertEqual(response.status_code, 302,
-                         "Unable to login for the test user")
-
+        self.login()
         data = {'strategy_name': 'strategy'}  # no user_file fields
         response = self.app.post(
             "/upload",
@@ -223,15 +234,7 @@ class TestUpload(TestBase):
         """
         strategy name cannot be empty
         """
-        response = self.app.post(
-            "/login",
-            data={
-                "email": "testuser@testuser.com",
-                "password": "testuser"},
-        )
-        self.assertEqual(response.status_code, 302,
-                         "Unable to login for the test user")
-
+        self.login()
         data = {'strategy_name': ''}  # no strategy name
         with open('tests/uploads/helpers.py', 'rb') as fh:
             buf = io.BytesIO(fh.read())
