@@ -188,7 +188,7 @@ class TestUpload(TestBase):
         )
 
         self.assertIn(b"Strategy name should not be greater than 50 characters", response.data,
-                      "observed long strategy name")
+                      "cannot detect long name")
 
     def test_upload_very_long_strategy_name(self):
         """
@@ -213,7 +213,7 @@ class TestUpload(TestBase):
         )
 
         self.assertIn(b"Strategy name should not be greater than 50 characters", response.data,
-                      "observed long strategy name")
+                      "cannot detect very long name")
 
     def test_upload_empty_file(self):
         """
