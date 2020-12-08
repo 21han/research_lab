@@ -33,18 +33,18 @@ class TestRegister(TestBase):
                       "Couldn't find link to /register")
 
     def test_register(self):
-        """test register users"""
-        response = self.app.get(
+        """test register a user with valid input info"""
+        self.app.get(
             "/register"
         )
 
         response = self.app.post(
             "/register",
             data={
-                "username": "000",
-                "email": "000@0.com",
-                "password": "000",
-                "confirm_password": "000"
+                "username": "12345",
+                "email": "12345@0.com",
+                "password": "abc.1234567890",
+                "confirm_password": "abc.1234567890"
             },
         )
 
@@ -61,7 +61,7 @@ class TestRegister(TestBase):
 
         conn = rds.get_connection()
         cursor = conn.cursor()
-        query = "delete from backtest.user where username = '000';"
+        query = "delete from backtest.user where username = '12345';"
         cursor.execute(
             query
         )
@@ -74,21 +74,19 @@ class TestRegister(TestBase):
         self.app.get(
             "/register"
         )
-
         response = self.app.post(
             "/register",
             data={
                 "username": "1",
                 "email": "1@1.com",
-                "password": "1234567",
-                "confirm_password": "1234567"
+                "password": "12345678900",
+                "confirm_password": "12345678900"
             },
         )
-
         self.assertEqual(response.status_code, 200,
-                         "can register a test user with username shorter than 2 characters")
+                         "register a user with username shorter than 2 characters")
 
-    def test_register_longer_username(self):
+    def test_register_long_username(self):
         """
         test register a user with username longer than 20 characters
         """
@@ -101,10 +99,148 @@ class TestRegister(TestBase):
             data={
                 "username": "abcdefghijklmnopqrstuvwxyz",
                 "email": "abcdefghijklmnopqrstuvwxyz@1.com",
-                "password": "1234567",
-                "confirm_password": "1234567"
+                "password": "12345678900",
+                "confirm_password": "12345678900"
+            },
+        )
+        self.assertEqual(response.status_code, 200,
+                         "register a user with username longer than 20 characters")
+
+    def test_register_with_valide_password(self):
+        """
+        test register a user with valid password
+        """
+        self.app.get(
+            "/register"
+        )
+
+        response = self.app.post(
+            "/register",
+            data={
+                "username": "12345",
+                "email": "12345@0.com",
+                "password": "abc.1234567890",
+                "confirm_password": "abc.1234567890"
             },
         )
 
+        self.assertEqual(response.status_code, 302,
+                         "Unable to register for the test user")
+
+        parsed_url = urlparse(response.location)
+        path = parsed_url.path
+
+        self.assertEqual(
+            path, "/login",
+            "Redirect location is not /login"
+        )
+
+        conn = rds.get_connection()
+        cursor = conn.cursor()
+        query = "delete from backtest.user where username = '12345';"
+        cursor.execute(
+            query
+        )
+        conn.commit()
+
+    def test_register_short_password(self):
+        """
+        test register a user with password shorter than 10 characters
+        """
+        self.app.get(
+            "/register"
+        )
+        response = self.app.post(
+            "/register",
+            data={
+                "username": "testuser",
+                "email": "testuser@testuser.com",
+                "password": "123",
+                "confirm_password": "123"
+            },
+        )
         self.assertEqual(response.status_code, 200,
-                         "can register a test user with username longer than 20 characters")
+                         "register a user with password shorter than 10 characters")
+
+    def test_register_long_password(self):
+        """
+        test register a user with password longer than 100 characters
+        """
+        self.app.get(
+            "/register"
+        )
+        response = self.app.post(
+            "/register",
+            data={
+                "username": "testuser",
+                "email": "testuser@testuser.com",
+                "password": "1234567"*100,
+                "confirm_password": "1234567"*100
+            },
+        )
+        self.assertEqual(response.status_code, 200,
+                         "register a user with password longer than 100 characters")
+
+    def test_register_unique_characters_password(self):
+        """
+        test register a user with password contains at least 5 unique characters
+        """
+        """
+        test register a user with valid password
+        """
+        self.app.get(
+            "/register"
+        )
+
+        response = self.app.post(
+            "/register",
+            data={
+                "username": "12345",
+                "email": "12345@0.com",
+                "password": "abc.1234567890",
+                "confirm_password": "abc.1234567890"
+            },
+        )
+
+        self.assertEqual(response.status_code, 302,
+                         "Unable to register for the test user")
+
+        parsed_url = urlparse(response.location)
+        path = parsed_url.path
+
+        self.assertEqual(
+            path, "/login",
+            "Redirect location is not /login"
+        )
+
+        conn = rds.get_connection()
+        cursor = conn.cursor()
+        query = "delete from backtest.user where username = '12345';"
+        cursor.execute(
+            query
+        )
+        conn.commit()
+
+
+    def test_register_duplicate_characters_password(self):
+        """
+        test register a user with password contains less than 5 unique characters
+        """
+        """
+        test register a user with valid password
+        """
+        self.app.get(
+            "/register"
+        )
+
+        response = self.app.post(
+            "/register",
+            data={
+                "username": "12345",
+                "email": "12345@0.com",
+                "password": "123123123123",
+                "confirm_password": "123123123123"
+            },
+        )
+        self.assertEqual(response.status_code, 200,
+                         "Unable to register for the test user")

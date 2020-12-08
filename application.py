@@ -392,6 +392,8 @@ def register():
     """
     form = RegistrationForm()
     if form.validate_on_submit():
+        if len(set(form.password.data)) < 5:
+            raise ValidationError('password should contain 5 or more unique characters')
         hashed_password = bcrypt.generate_password_hash(
             form.password.data).decode('utf-8')
 
@@ -403,7 +405,8 @@ def register():
         db.session.add(user)
         db.session.commit()
         flash(
-            f'Your account has been created! An admin is reviewing your registration request, please check-in again in 24 hours',
+            f'Your account has been created! An admin is reviewing your registration request, please check-in again '
+            f'in 24 hours',
             'success')
         return redirect(url_for('login'))
     return render_template(
@@ -1004,10 +1007,18 @@ class RegistrationForm(FlaskForm):
     """
     username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
     email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=10, max=100)])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(),
                                                                      EqualTo('password')])
     submit = SubmitField('Sign Up')
+    def validate_password(self, password):
+        """
+        check if password is in valid format
+        :param password:
+        :return:
+        """
+        if len(set(password.data)) < 5:
+            raise ValidationError('Password should contain at least 5 unique characters')
 
     def validate_username(self, username):
         """check if username exists in the current user table
@@ -1034,6 +1045,8 @@ class RegistrationForm(FlaskForm):
         user = User.query.filter_by(email=email.data).first()
         if user:
             raise ValidationError('That email is taken. Please choose a different one.')
+
+
 
 
 class LoginForm(FlaskForm):
