@@ -165,6 +165,56 @@ class TestUpload(TestBase):
         self.assertIn(b"No strategy name specified", response.data,
                       "cannot check no strategy_name field")
 
+    def test_upload_long_strategy_name(self):
+        """
+        The test strategy name is too long
+        """
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
+        )
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the test user")
+
+        data = {'strategy_name': 'a'*50}
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+
+        self.assertIn(b"Strategy name should not be greater than 50 characters", response.data,
+                      "observed long strategy name")
+
+    def test_upload_very_long_strategy_name(self):
+        """
+        The test strategy name is too long
+        """
+        response = self.app.post(
+            "/login",
+            data={
+                "email": "testuser@testuser.com",
+                "password": "testuser"},
+        )
+        self.assertEqual(response.status_code, 302,
+                         "Unable to login for the test user")
+
+        data = {'strategy_name': 'a'*100}
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+
+        self.assertIn(b"Strategy name should not be greater than 50 characters", response.data,
+                      "observed long strategy name")
+
     def test_upload_empty_file(self):
         """
         special case 1: empty file
