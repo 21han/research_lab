@@ -160,9 +160,40 @@ class TestUpload(TestBase):
         self.assertIn(b"Strategy name should not be greater than 50 characters", response.data,
                       "cannot detect long name")
 
+    def test_upload_lower_boundary_strategy_name(self):
+        """
+        test strategy name has length 49, boundary is 50.
+        """
+        self.login()
+        data = {'strategy_name': 'a' * 49}
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+        self.assertEqual(response.status_code, 200, "uploaded valid strategy")
+
+    def test_upload_upper_boundary_strategy_name(self):
+        """
+        test strategy name has length 51, boundary is 50.
+        """
+        self.login()
+        data = {'strategy_name': 'a' * 51}
+        with open('tests/uploads/helpers.py', 'rb') as fh:
+            buf = io.BytesIO(fh.read())
+            data['user_file'] = (buf, '')
+        response = self.app.post(
+            "/upload",
+            data=data,
+        )
+        self.assertIn(b"Strategy name should not be greater than 50 characters", response.data,
+                      "cannot detect long name")
+
     def test_upload_normal_length_strategy_name(self):
         """
-        The test strategy name is too long
+        The test strategy with normal length
         """
         self.login()
         data = {'strategy_name': 'a' * 30}
@@ -177,7 +208,7 @@ class TestUpload(TestBase):
 
     def test_upload_very_long_strategy_name(self):
         """
-        The test strategy name is too long
+        The test strategy with very long name
         """
         self.login()
         data = {'strategy_name': 'a' * 100}
