@@ -212,7 +212,8 @@ def test_update_fig_invalid():
 def test_get_plot():
     """
     Test get_plot with valid strategy id list, should return true
-    to demonstrate we update global variables in application.
+    to demonstrate we update global variables in application,
+    which will update dropdown bar for visualization.
     :return:
     """
     _, strategy_id = before_test()
@@ -222,12 +223,28 @@ def test_get_plot():
     assert result
 
 
+def test_get_plot_more_results():
+    """
+    Test get_plot with valid strategy id list, should return true
+    to demonstrate we update global variables in application,
+    which will update dropdown bar for visualization.
+    :return:
+    """
+    _, strategy_id1 = before_test()
+    _, strategy_id2 = before_test()
+    _, strategy_id3 = before_test()
+    test_ids = [str(strategy_id1), str(strategy_id2), str(strategy_id3)]
+
+    # test with 3 strategy ids
+    result = app.get_plot(test_ids)
+    assert result
+
+
 def test_get_plot_invalid():
     """
     Test get_plot with empty list, should return false to demonstrate nothing changed.
     :return:
     """
-
     result = app.get_plot([])
     assert not result
 
