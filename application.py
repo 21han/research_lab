@@ -287,6 +287,10 @@ def upload_strategy():
     name = request.form["strategy_name"]
     if name == "":
         return "Strategy name may not be empty"
+
+    if len(name) >= 50:
+        return "Strategy name should not be greater than 50 characters"
+
     message = check_upload_file(file)
     if message != "OK":
         return message
@@ -394,6 +398,10 @@ def register():
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(
             form.password.data).decode('utf-8')
+
+        if len(form.username.data) < 2 or len(form.username.data) > 20:
+            raise ValidationError
+
         user = User(username=form.username.data,
                     email=form.email.data, password=hashed_password)
         db.session.add(user)

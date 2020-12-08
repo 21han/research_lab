@@ -11,6 +11,7 @@ class TestRegister(TestBase):
     """
     Test register a user
     """
+
     def test_register_directory(self):
         """
         GET /register
@@ -30,6 +31,7 @@ class TestRegister(TestBase):
                          "Could not access /register route")
         self.assertIn(b"Register", response.data,
                       "Couldn't find link to /register")
+
     def test_register(self):
         """test register users"""
         response = self.app.get(
@@ -64,3 +66,45 @@ class TestRegister(TestBase):
             query
         )
         conn.commit()
+
+    def test_register_short_username(self):
+        """
+        test register a user with username shorter than 2 characters
+        """
+        self.app.get(
+            "/register"
+        )
+
+        response = self.app.post(
+            "/register",
+            data={
+                "username": "1",
+                "email": "1@1.com",
+                "password": "1234567",
+                "confirm_password": "1234567"
+            },
+        )
+
+        self.assertEqual(response.status_code, 200,
+                         "can register a test user with username shorter than 2 characters")
+
+    def test_register_longer_username(self):
+        """
+        test register a user with username longer than 20 characters
+        """
+        self.app.get(
+            "/register"
+        )
+
+        response = self.app.post(
+            "/register",
+            data={
+                "username": "abcdefghijklmnopqrstuvwxyz",
+                "email": "abcdefghijklmnopqrstuvwxyz@1.com",
+                "password": "1234567",
+                "confirm_password": "1234567"
+            },
+        )
+
+        self.assertEqual(response.status_code, 200,
+                         "can register a test user with username longer than 20 characters")
