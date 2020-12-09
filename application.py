@@ -86,7 +86,8 @@ client = WebApplicationClient(application.config["GOOGLE_CLIENT_ID"])
 migrate = Migrate(application, db)
 
 # dash object
-dash_app = Dash(__name__, server=application, url_base_pathname='/dash_plots/')
+dash_app = Dash(__name__, server=application, external_stylesheets=[dbc.themes.BOOTSTRAP],
+                url_base_pathname='/dash_plots/')
 dash_app.validation_layout = True
 dash_app._layout = html.Div()
 # global variables for update dash dynamically depending on different user
@@ -694,6 +695,8 @@ def user_results():
     :return:
     """
     user_id = current_user.id
+    if type(user_id) == pd.DataFrame:
+        user_id = int(user_id['id'].iloc[0])
     update_layout(user_id)
     return redirect('/dash_plots')
 
@@ -711,7 +714,7 @@ def render_reports():
 @application.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
     """
-    send reset passwrod request
+    send reset password request
     :return:
     """
     if current_user.is_authenticated:
@@ -767,16 +770,6 @@ If you did not make this request then simply ignore this email and no changes wi
 
 
 # helper functions
-
-def get_user_backtests(user_id):
-    """
-    Get backtest dataframe from rds.
-    :param user_id: user id
-    :return: dataframe
-    """
-    back_tests = rds.get_all_backtests(user_id)
-    return back_tests
-
 
 def save_picture(form_picture):
     """ save user uploaded profile picture with formatted size in database
@@ -1330,45 +1323,47 @@ def fig_update(file_path):
 
 
 def new_plot():
+    LOGO = "/assets/Logo_Columbia.png"
     content_style = {
         "margin-left": "32rem",
         "margin-right": "2rem",
         "padding": "2rem 1rem",
     }
     global OptionList
+    navbar = dbc.NavbarSimple(
+        children=[
+            dbc.NavItem(dbc.NavLink("Home", href="https://localhost:5000/upload"),
+                        style=dict(width='200%'), className="ml-2"),
+            dbc.NavItem(dbc.NavLink("Strategies", href="https://localhost:5000/strategies"),
+                        style=dict(width='200%'), className="ml-2"),
+            html.Div(dcc.Dropdown(
+                id='backtest_result',
+                options=OptionList,
+                placeholder="Select Backtest Result",
+                style=dict(
+                        width='200%',
+                        verticalAlign="left"),
+                className="dash-bootstrap"
+            ), style={"width": "200%"},)
+        ],
+        brand="Backtesting Platform",
+        brand_href="https://localhost:5000/welcome",
+        color="primary",
+        dark=True,
+
+    )
+
     contents = html.Div([
-
+        navbar,
         html.Div(
             [
-                dcc.Dropdown(
-                    id='backtest_result',
-                    options=OptionList,
-                    placeholder="Select Backtest Result",
-                    style=dict(
-                        width='70%',
-                        verticalAlign="middle"
-                    ),
-
-                ),
-                html.Div(
-                    [
-                        html.A(dbc.Button("Go Back", outline=True, color="primary", className="mr-1"),
-                               href='/strategies'),
-                    ],
-                ),
-            ],
-            style=dict(display='flex')
-        ),
-
-        html.Div(
-            [
-                html.H1('Cumulative Return',
-                        style={'textAlign': 'center'}),
+                html.H2('Cumulative Return',
+                        style={'textAlign': 'center', 'font-family': 'Georgia'}),
                 html.Hr(),
                 dbc.Row(
                     [
                         dbc.Col(dcc.Graph(id='pnl_fig'),
-                                width={"size": 8, "offset": 2}),
+                                width={"size": 10, "offset": 2}),
                     ]
                 )
 
@@ -1378,13 +1373,13 @@ def new_plot():
 
         html.Div(
             [
-                html.H1('Rolling Sharpe Ratio (6-months)',
-                        style={'textAlign': 'center'}),
+                html.H2('Rolling Sharpe Ratio (6-months)',
+                        style={'textAlign': 'center', 'font-family': 'Georgia'}),
                 html.Hr(),
                 dbc.Row(
                     [
                         dbc.Col(dcc.Graph(id='sr_rolling'),
-                                width={"size": 8, "offset": 2}),
+                                width={"size": 10, "offset": 2}),
                     ]
                 )
             ],
@@ -1393,13 +1388,13 @@ def new_plot():
 
         html.Div(
             [
-                html.H1('Profit and Loss histogram',
-                        style={'textAlign': 'center'}),
+                html.H2('Profit and Loss histogram',
+                        style={'textAlign': 'center', 'font-family': 'Georgia'}),
                 html.Hr(),
                 dbc.Row(
                     [
                         dbc.Col(dcc.Graph(id='pnl_hist'),
-                                width={"size": 8, "offset": 2}),
+                                width={"size": 10, "offset": 2}),
                     ]
                 )
 
@@ -1425,8 +1420,8 @@ def update_graph(backtest_fp):
     """
     table_style = {
         "position": "fixed",
-        "top": 80,
-        "left": 0,
+        "top": 60,
+        "left": 5,
         "bottom": 5,
         "width": "30rem",
         "padding": "2rem 1rem",
@@ -1438,15 +1433,15 @@ def update_graph(backtest_fp):
         table_df = pnl_summary(pnl_df)
         table_comp = html.Div(
             [
-                html.H1('Statistic Table',
-                        style={'font_size': '80',
-                               'text_align': 'center'}),
+                html.H2('Statistic Table',
+                        style={'textAlign': 'center', 'font-family': 'Georgia',
+                               'front_size': '30'}),
                 html.Hr(),
                 dt.DataTable(
                     data=table_df.to_dict('records'),
                     columns=[{'id': c, 'name': c} for c in table_df.columns],
 
-                    style_cell={'front_size': '16px'},
+                    style_cell={'front_size': '30px'},
                     style_cell_conditional=[
                         {
                             'if': {'column_id': 'Backtest'},
@@ -1579,7 +1574,7 @@ if __name__ == "__main__":
     application.debug = True
 
     dash_app.layout = new_plot
-
+    dash_app.title = 'Visualization'
     app_embeds = DispatcherMiddleware(application, {
         '/dash_plot': dash_app.server
     })
