@@ -29,8 +29,8 @@ class TestBase(unittest.TestCase):
             data={
                 "username": "testuser",
                 "email": "testuser@testuser.com",
-                "password": "testuser",
-                "confirm_password": "testuser"
+                "password": "testusertestuser",
+                "confirm_password": "testusertestuser"
             },
         )
 

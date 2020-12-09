@@ -22,6 +22,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
+import timeago
 from PIL import Image
 from dash import Dash
 from dash.dependencies import Input, Output
@@ -363,7 +364,7 @@ def upload_strategy():
 
     # store in database
     cursor = conn.cursor()
-    timestamp = str(datetime.datetime.now())
+    timestamp = str(datetime.datetime.utcnow())
 
     query = "INSERT INTO backtest.strategies (user_id, strategy_location, \
         last_modified_date, last_modified_user, strategy_name) \
@@ -397,6 +398,8 @@ def register():
     """
     form = RegistrationForm()
     if form.validate_on_submit():
+        if len(set(form.password.data)) < 5:
+            raise ValidationError('password should contain 5 or more unique characters')
         hashed_password = bcrypt.generate_password_hash(
             form.password.data).decode('utf-8')
 
@@ -408,7 +411,8 @@ def register():
         db.session.add(user)
         db.session.commit()
         flash(
-            f'Your account has been created! An admin is reviewing your registration request, please check-in again in 24 hours',
+            f'Your account has been created! An admin is reviewing your registration request, please check-in again '
+            f'in 24 hours',
             'success')
         return redirect(url_for('login'))
     return render_template(
@@ -480,6 +484,9 @@ def all_strategy():
     current_user_id = current_user.id
     username = current_user.username
     all_user_strategies = get_user_strategies(current_user_id)
+
+    all_user_strategies['last_modified_date'] = all_user_strategies['last_modified_date'].apply(
+        lambda d: timeago.format(d, datetime.datetime.utcnow()))
     return render_template(
         'strategies.html',
         df=all_user_strategies,
@@ -573,7 +580,7 @@ def backtest_progress():
 
     n_days_back = 365  # we backtest using past 1 year's data
     past_n_days = [
-        datetime.datetime.today() -
+        datetime.datetime.utcnow() -
         datetime.timedelta(
             days=i) for i in range(n_days_back)]
     past_n_days = sorted(past_n_days)
@@ -648,7 +655,7 @@ def update_backtest_db(strategy_id, bucket, key):
     """
     conn = rds.get_connection()
     cursor = conn.cursor()
-    timestamp = datetime.datetime.now()
+    timestamp = datetime.datetime.utcnow()
 
     query = "REPLACE INTO backtest.backtests (strategy_id, backtest_id," \
             "pnl_location, last_modified_date) \
@@ -1009,10 +1016,18 @@ class RegistrationForm(FlaskForm):
     """
     username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
     email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=10, max=100)])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(),
                                                                      EqualTo('password')])
     submit = SubmitField('Sign Up')
+    def validate_password(self, password):
+        """
+        check if password is in valid format
+        :param password:
+        :return:
+        """
+        if len(set(password.data)) < 5:
+            raise ValidationError('Password should contain at least 5 unique characters')
 
     def validate_username(self, username):
         """check if username exists in the current user table
@@ -1039,6 +1054,8 @@ class RegistrationForm(FlaskForm):
         user = User.query.filter_by(email=email.data).first()
         if user:
             raise ValidationError('That email is taken. Please choose a different one.')
+
+
 
 
 class LoginForm(FlaskForm):
