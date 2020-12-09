@@ -695,6 +695,8 @@ def user_results():
     :return:
     """
     user_id = current_user.id
+    if type(user_id) == pd.DataFrame:
+        user_id = int(user_id['id'].iloc[0])
     update_layout(user_id)
     return redirect('/dash_plots')
 
@@ -712,7 +714,7 @@ def render_reports():
 @application.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
     """
-    send reset passwrod request
+    send reset password request
     :return:
     """
     if current_user.is_authenticated:
@@ -768,16 +770,6 @@ If you did not make this request then simply ignore this email and no changes wi
 
 
 # helper functions
-
-def get_user_backtests(user_id):
-    """
-    Get backtest dataframe from rds.
-    :param user_id: user id
-    :return: dataframe
-    """
-    back_tests = rds.get_all_backtests(user_id)
-    return back_tests
-
 
 def save_picture(form_picture):
     """ save user uploaded profile picture with formatted size in database
