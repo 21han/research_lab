@@ -148,6 +148,8 @@ def callback():
         current_user.id = int(unique_id)
     else:
         return "User email not available or not verified by Google", 400
+    # WARNING: HACK THIS METHOD
+    unique_id = unique_id[3:]
     user = OAuthUser(
         id_=unique_id, username=user_name, email=user_email, image_file=picture
     )
