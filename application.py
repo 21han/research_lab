@@ -260,6 +260,7 @@ def upload():
     Returns:
         function: render home.html page with context of login user's username
     """
+    current_user_init()
     context = {"username": current_user.username,
                "report": "",
                "message": "Your upload check detail will be shown here"}
@@ -270,7 +271,7 @@ def upload():
 @login_required
 def upload_strategy():
     """upload user strategy to alchemist database
-
+    
     Returns:
         string: return message of upload status with corresponding pylint score
     test_id = num -> it is for testing
@@ -280,7 +281,7 @@ def upload_strategy():
     local has its own count
     and cloud has its own count
     """
-
+    current_user_init()
     if "user_file" not in request.files:
         return "No user_file is specified"
     if "strategy_name" not in request.form:
@@ -439,6 +440,7 @@ def account():
     Returns:
         function : render account.html page with title account
     """
+    current_user_init()
     form = UpdateAccountForm()
     if form.validate_on_submit():
         if form.picture.data:
@@ -500,6 +502,7 @@ def get_strategy_to_local(strategy_location):
     :param strategy_location: s3_resource loction
     :return: local strategy file path
     """
+    current_user_init()
     s3_resource = s3_util.init_s3()
 
     if "/" not in strategy_location:
@@ -575,6 +578,7 @@ def backtest_progress():
     backtest progress
     :return:
     """
+    current_user_init()
     strategy_id = request.args.get('id')
     current_usr_id = current_user.id
 
@@ -694,7 +698,10 @@ def user_results():
     Redirect to dosh route for visualization.
     :return:
     """
+    current_user_init()
     user_id = current_user.id
+    if type(user_id) == pd.DataFrame:
+        user_id = int(user_id['id'].iloc[0])
     update_layout(user_id)
     return redirect('/dash_plots')
 
@@ -712,7 +719,7 @@ def render_reports():
 @application.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
     """
-    send reset passwrod request
+    send reset password request
     :return:
     """
     if current_user.is_authenticated:
@@ -768,6 +775,32 @@ If you did not make this request then simply ignore this email and no changes wi
 
 
 # helper functions
+def current_user_init():
+    """
+    current_user.field for oauth is pandas.Dataframe
+    we need to refactor current_user object
+    
+    current_user is a global object
+    """
+    conn = rds.get_connection()
+    if isinstance(current_user.email, str):
+        userid = pd.read_sql(
+            f"select id from backtest.user "
+            f"where email = '{current_user.email}';",
+            conn
+        )
+        current_user.id = int(userid['id'].iloc[0])
+    else:
+        current_user.email = str(current_user.email['email'].iloc[0])
+        userid = pd.read_sql(
+            f"select * from backtest.OAuth_user "
+            f"where email = '{current_user.email}';",
+            conn
+        )
+        current_user.id = int(userid['id'].iloc[0])
+        current_user.username = str(userid['username'].iloc[0])
+        current_user.image_file = str(userid['image_file'].iloc[0])
+
 
 def save_picture(form_picture):
     """ save user uploaded profile picture with formatted size in database
