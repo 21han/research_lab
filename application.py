@@ -363,7 +363,7 @@ def upload_strategy():
 
     # store in database
     cursor = conn.cursor()
-    timestamp = str(datetime.datetime.now())
+    timestamp = str(datetime.datetime.utcnow())
 
     query = "INSERT INTO backtest.strategies (user_id, strategy_location, \
         last_modified_date, last_modified_user, strategy_name) \
@@ -485,7 +485,7 @@ def all_strategy():
     all_user_strategies = get_user_strategies(current_user_id)
 
     all_user_strategies['last_modified_date'] = all_user_strategies['last_modified_date'].apply(
-        lambda d: timeago.format(d, datetime.datetime.now() ))
+        lambda d: timeago.format(d, datetime.datetime.utcnow()))
     return render_template(
         'strategies.html',
         df=all_user_strategies,
@@ -579,7 +579,7 @@ def backtest_progress():
 
     n_days_back = 365  # we backtest using past 1 year's data
     past_n_days = [
-        datetime.datetime.today() -
+        datetime.datetime.utcnow() -
         datetime.timedelta(
             days=i) for i in range(n_days_back)]
     past_n_days = sorted(past_n_days)
@@ -654,7 +654,7 @@ def update_backtest_db(strategy_id, bucket, key):
     """
     conn = rds.get_connection()
     cursor = conn.cursor()
-    timestamp = datetime.datetime.now()
+    timestamp = datetime.datetime.utcnow()
 
     query = "REPLACE INTO backtest.backtests (strategy_id, backtest_id," \
             "pnl_location, last_modified_date) \
