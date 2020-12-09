@@ -179,19 +179,15 @@ def home():
 
     :return: redirect user to upload page
     """
-    global current_user
     if current_user.is_authenticated:
-        logger.info("here here here")
         conn = rds.get_connection()
         if isinstance(current_user.email, str):
-            logger.info("ordinary user !!!!!!!!!")
             userid = pd.read_sql(
                 f"select id from backtest.user where email = '{current_user.email}';",
                 conn
             )
             current_user.id = int(userid['id'].iloc[0])
         else:
-            logger.info("oauth user !!!!!!!!!")
             current_user.email = str(current_user.email['email'].iloc[0])
             userid = pd.read_sql(
                 f"select id from backtest.OAuth_user where email = '{current_user.email}';",
@@ -785,6 +781,7 @@ def current_user_init():
     
     current_user is a global object
     """
+    conn = rds.get_connection()
     if isinstance(current_user.email, str):
         userid = pd.read_sql(
             f"select id from backtest.user "
@@ -794,7 +791,6 @@ def current_user_init():
         current_user.id = int(userid['id'].iloc[0])
     else:
         current_user.email = str(current_user.email['email'].iloc[0])
-        conn = rds.get_connection()
         userid = pd.read_sql(
             f"select * from backtest.OAuth_user "
             f"where email = '{current_user.email}';",
