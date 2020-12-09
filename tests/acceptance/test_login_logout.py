@@ -149,8 +149,8 @@ class TestLoginLogout(TestBase):
             data={
                 "username": "not_approve",
                 "email": "need@approve.com",
-                "password": "000",
-                "confirm_password": "000"
+                "password": "12345678900",
+                "confirm_password": "12345678900"
             },
         )
 
