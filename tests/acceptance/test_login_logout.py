@@ -72,7 +72,6 @@ class TestLoginLogout(TestBase):
         self.assertEqual(response.status_code, 200,
                          "Can login the test user with wrong password")
 
-
     def test_admin_login(self):
         """login test users"""
         response = self.app.post(
