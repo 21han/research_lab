@@ -769,16 +769,6 @@ If you did not make this request then simply ignore this email and no changes wi
 
 # helper functions
 
-def get_user_backtests(user_id):
-    """
-    Get backtest dataframe from rds.
-    :param user_id: user id
-    :return: dataframe
-    """
-    back_tests = rds.get_all_backtests(user_id)
-    return back_tests
-
-
 def save_picture(form_picture):
     """ save user uploaded profile picture with formatted size in database
 
@@ -1331,7 +1321,7 @@ def fig_update(file_path):
 
 
 def new_plot():
-    LOGO = "/assets/Logo_Columbia.png"
+
     content_style = {
         "margin-left": "32rem",
         "margin-right": "2rem",
