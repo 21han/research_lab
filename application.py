@@ -22,6 +22,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
+import timeago
 from PIL import Image
 from dash import Dash
 from dash.dependencies import Input, Output
@@ -482,6 +483,9 @@ def all_strategy():
     current_user_id = current_user.id
     username = current_user.username
     all_user_strategies = get_user_strategies(current_user_id)
+
+    all_user_strategies['last_modified_date'] = all_user_strategies['last_modified_date'].apply(
+        lambda d: timeago.format(d, datetime.datetime.now() ))
     return render_template(
         'strategies.html',
         df=all_user_strategies,
