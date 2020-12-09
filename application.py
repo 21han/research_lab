@@ -456,8 +456,11 @@ def account():
         form.email.data = current_user.email
     else:
         raise Exception("Invalid Operation")
-    image_file = url_for('static',
-                         filename='profile_pics/' + current_user.image_file)
+    if hasattr(current_user, "password"):
+        image_file = url_for('static',
+                             filename='profile_pics/' + current_user.image_file)
+    else:
+        image_file = current_user.image_file
     return render_template('account.html', title='Account',
                            image_file=image_file, form=form)
 
