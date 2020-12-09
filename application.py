@@ -85,7 +85,8 @@ client = WebApplicationClient(application.config["GOOGLE_CLIENT_ID"])
 migrate = Migrate(application, db)
 
 # dash object
-dash_app = Dash(__name__, server=application, url_base_pathname='/dash_plots/')
+dash_app = Dash(__name__, server=application, external_stylesheets=[dbc.themes.BOOTSTRAP],
+                url_base_pathname='/dash_plots/')
 dash_app.validation_layout = True
 dash_app._layout = html.Div()
 # global variables for update dash dynamically depending on different user
@@ -1318,11 +1319,32 @@ def new_plot():
         "margin-right": "2rem",
         "padding": "2rem 1rem",
     }
+
+    navbar = dbc.NavbarSimple(
+        children=[
+            dbc.NavItem(dbc.NavLink("Page 1", href="#")),
+            dbc.DropdownMenu(
+                children=[
+                    dbc.DropdownMenuItem("More pages", header=True),
+                    dbc.DropdownMenuItem("Page 2", href="#"),
+                    dbc.DropdownMenuItem("Page 3", href="#"),
+                ],
+                nav=True,
+                in_navbar=True,
+                label="More",
+            ),
+        ],
+        brand="NavbarSimple",
+        brand_href="#",
+        color="primary",
+        dark=True,
+    )
     global OptionList
     contents = html.Div([
 
         html.Div(
             [
+                navbar,
                 dcc.Dropdown(
                     id='backtest_result',
                     options=OptionList,
@@ -1337,7 +1359,7 @@ def new_plot():
                     [
                         html.A(dbc.Button("Go Back", outline=True, color="primary", className="mr-1"),
                                href='/strategies'),
-                    ],
+                    ],style = {"width": "80%","display": "inline-block"}
                 ),
             ],
             style=dict(display='flex')
