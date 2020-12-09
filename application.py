@@ -1314,66 +1314,47 @@ def fig_update(file_path):
 
 
 def new_plot():
+    LOGO = "/assets/Logo_Columbia.png"
     content_style = {
         "margin-left": "32rem",
         "margin-right": "2rem",
         "padding": "2rem 1rem",
     }
-
+    global OptionList
     navbar = dbc.NavbarSimple(
         children=[
-            dbc.NavItem(dbc.NavLink("Page 1", href="#")),
-            dbc.DropdownMenu(
-                children=[
-                    dbc.DropdownMenuItem("More pages", header=True),
-                    dbc.DropdownMenuItem("Page 2", href="#"),
-                    dbc.DropdownMenuItem("Page 3", href="#"),
-                ],
-                nav=True,
-                in_navbar=True,
-                label="More",
-            ),
+            dbc.NavItem(dbc.NavLink("Home", href="https://localhost:5000/upload"),
+                        style=dict(width='200%'), className="ml-2"),
+            dbc.NavItem(dbc.NavLink("Strategies", href="https://localhost:5000/strategies"),
+                        style=dict(width='200%'), className="ml-2"),
+            html.Div(dcc.Dropdown(
+                id='backtest_result',
+                options=OptionList,
+                placeholder="Select Backtest Result",
+                style=dict(
+                        width='200%',
+                        verticalAlign="left"),
+                className="dash-bootstrap"
+            ), style={"width": "200%"},)
         ],
-        brand="NavbarSimple",
-        brand_href="#",
+        brand="Backtesting Platform",
+        brand_href="https://localhost:5000/welcome",
         color="primary",
         dark=True,
+
     )
-    global OptionList
+
     contents = html.Div([
-
+        navbar,
         html.Div(
             [
-                navbar,
-                dcc.Dropdown(
-                    id='backtest_result',
-                    options=OptionList,
-                    placeholder="Select Backtest Result",
-                    style=dict(
-                        width='70%',
-                        verticalAlign="middle"
-                    ),
-
-                ),
-                html.Div(
-                    [
-                        html.A(dbc.Button("Go Back", outline=True, color="primary", className="mr-1"),
-                               href='/strategies'),
-                    ],style = {"width": "80%","display": "inline-block"}
-                ),
-            ],
-            style=dict(display='flex')
-        ),
-
-        html.Div(
-            [
-                html.H1('Cumulative Return',
-                        style={'textAlign': 'center'}),
+                html.H2('Cumulative Return',
+                        style={'textAlign': 'center', 'font-family': 'Georgia'}),
                 html.Hr(),
                 dbc.Row(
                     [
                         dbc.Col(dcc.Graph(id='pnl_fig'),
-                                width={"size": 8, "offset": 2}),
+                                width={"size": 10, "offset": 2}),
                     ]
                 )
 
@@ -1383,13 +1364,13 @@ def new_plot():
 
         html.Div(
             [
-                html.H1('Rolling Sharpe Ratio (6-months)',
-                        style={'textAlign': 'center'}),
+                html.H2('Rolling Sharpe Ratio (6-months)',
+                        style={'textAlign': 'center', 'font-family': 'Georgia'}),
                 html.Hr(),
                 dbc.Row(
                     [
                         dbc.Col(dcc.Graph(id='sr_rolling'),
-                                width={"size": 8, "offset": 2}),
+                                width={"size": 10, "offset": 2}),
                     ]
                 )
             ],
@@ -1398,13 +1379,13 @@ def new_plot():
 
         html.Div(
             [
-                html.H1('Profit and Loss histogram',
-                        style={'textAlign': 'center'}),
+                html.H2('Profit and Loss histogram',
+                        style={'textAlign': 'center', 'font-family': 'Georgia'}),
                 html.Hr(),
                 dbc.Row(
                     [
                         dbc.Col(dcc.Graph(id='pnl_hist'),
-                                width={"size": 8, "offset": 2}),
+                                width={"size": 10, "offset": 2}),
                     ]
                 )
 
@@ -1430,8 +1411,8 @@ def update_graph(backtest_fp):
     """
     table_style = {
         "position": "fixed",
-        "top": 80,
-        "left": 0,
+        "top": 60,
+        "left": 5,
         "bottom": 5,
         "width": "30rem",
         "padding": "2rem 1rem",
@@ -1443,15 +1424,15 @@ def update_graph(backtest_fp):
         table_df = pnl_summary(pnl_df)
         table_comp = html.Div(
             [
-                html.H1('Statistic Table',
-                        style={'font_size': '80',
-                               'text_align': 'center'}),
+                html.H2('Statistic Table',
+                        style={'textAlign': 'center', 'font-family': 'Georgia',
+                               'front_size': '30'}),
                 html.Hr(),
                 dt.DataTable(
                     data=table_df.to_dict('records'),
                     columns=[{'id': c, 'name': c} for c in table_df.columns],
 
-                    style_cell={'front_size': '16px'},
+                    style_cell={'front_size': '30px'},
                     style_cell_conditional=[
                         {
                             'if': {'column_id': 'Backtest'},
