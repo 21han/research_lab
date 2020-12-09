@@ -1363,19 +1363,6 @@ def fig_update(file_path):
 
     return cr_fig, sr_rolling, pnl_hist, pnl_df, fig_3d
 
-
-def rolling_max_dd(x, window_size, min_periods=1):
-    """Compute the rolling maximum drawdown of `x`.
-    Returns an 1d array with length `len(x) - min_periods + 1`.
-    """
-    if min_periods < window_size:
-        pad = np.empty(window_size - min_periods)
-        pad.fill(x[0])
-        x = np.concatenate((pad, x))
-    y = windowed_view(x, window_size)
-    running_max_y = np.maximum.accumulate(y, axis=1)
-    dd = y - running_max_y
-    return dd.min(axis=1)
 def new_plot():
 
     content_style = {
