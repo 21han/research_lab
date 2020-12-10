@@ -28,9 +28,9 @@ from dash import Dash
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 from flask import Flask, flash, redirect, url_for
-from flask import send_from_directory
 from flask import render_template
 from flask import request
+from flask import send_from_directory
 from flask_admin import Admin, BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask_bcrypt import Bcrypt
