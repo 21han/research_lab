@@ -442,7 +442,7 @@ def account():
     """
     current_user_init()
     form = UpdateAccountForm()
-    if form.validate_on_submit():
+    if hasattr(current_user, "password") and form.validate_on_submit():
         if form.picture.data:
             picture_file = save_picture(form.picture.data)
             current_user.image_file = picture_file
@@ -455,7 +455,7 @@ def account():
         form.username.data = current_user.username
         form.email.data = current_user.email
     else:
-        raise Exception("Invalid Operation")
+        flash('Google account info cannot be updated', 'warning')
     if hasattr(current_user, "password"):
         image_file = url_for('static',
                              filename='profile_pics/' + current_user.image_file)
