@@ -562,8 +562,8 @@ def delete_strategy():
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
 
-    delete_strategy_by_user(strategy_location)
-    return redirect('strategies')
+    delete_strategy_by_user(strategy_location, strategy_id)
+    return redirect('strategies/1')
 
 
 @application.route('/log_strategy')
@@ -973,7 +973,7 @@ def upload_strategy_to_s3(
     return "{}{}".format(application.config["S3_LOCATION"], upload_path)
 
 
-def delete_strategy_by_user(filepath):
+def delete_strategy_by_user(filepath, strategy_id=None):
     """delete a strategy
 
     Args:
@@ -982,8 +982,10 @@ def delete_strategy_by_user(filepath):
 
     ASSUME THE FILEPATH is always valid
     NOTE: Need to delete both s3 and database
+    :param strategy_id: default None
     """
-    conn = rds.get_connection()
+    logger.info(f"*****{filepath}\n\n")
+
     bucket_name = application.config["S3_BUCKET"]
     split_path = filepath.split('/')
     prefix = "/".join(split_path[3:])
@@ -992,18 +994,29 @@ def delete_strategy_by_user(filepath):
         Bucket=bucket_name, Prefix=prefix
     )
     object_cnt = response["KeyCount"]
-    s3_object = response['Contents'][0]  # assume only one match
-    logger.info("affected objects = %d", object_cnt)
-    logger.info("Delete file from AWS")
-    s3_client.delete_object(Bucket=bucket_name, Key=s3_object['Key'])
-    logger.info("Delete file from AWS")
+    conn = rds.get_connection()
     cursor = conn.cursor()
-    query = "DELETE FROM backtest.strategies \
-                WHERE strategy_location = %s"
-    cursor.execute(query, (filepath,))
-    conn.commit()
-    logger.info("affected rows = %d", cursor.rowcount)
-    logger.info("Delete file from Database")
+    delete_strategy_qry = "DELETE FROM backtest.strategies \
+                 WHERE strategy_location = %s"
+    delete_backtest_qry = f"DELETE FROM backtest.backtests \
+                 WHERE strategy_id = {int(strategy_id)}" if strategy_id else "SELECT @@VERSION;"
+    if object_cnt == 0:
+        cursor.execute(delete_backtest_qry)
+        cursor.execute(delete_strategy_qry, (filepath,))
+        conn.commit()
+        logger.info("affected rows = %d", cursor.rowcount)
+        logger.info("Delete file from Database")
+    else:
+        s3_object = response['Contents'][0]  # assume only one match
+        logger.info("affected objects = %d", object_cnt)
+        logger.info("Delete file from AWS")
+        s3_client.delete_object(Bucket=bucket_name, Key=s3_object['Key'])
+        logger.info("Delete file from AWS")
+        cursor.execute(delete_backtest_qry)
+        cursor.execute(delete_strategy_qry, (filepath,))
+        conn.commit()
+        logger.info("affected rows = %d", cursor.rowcount)
+        logger.info("Delete file from Database")
 
 
 def clean_pylint_output(pylint_message):
