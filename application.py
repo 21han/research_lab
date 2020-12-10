@@ -29,6 +29,7 @@ from dash.exceptions import PreventUpdate
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
 from flask import request
+from flask import send_from_directory
 from flask_admin import Admin, BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask_bcrypt import Bcrypt
@@ -97,6 +98,10 @@ TOTAL_CAPITAL = 10 ** 6
 
 
 # endpoint routes
+@application.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
 @application.route("/OAuth_login")
