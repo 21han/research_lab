@@ -1375,10 +1375,10 @@ def new_plot():
                 options=OptionList,
                 placeholder="Select Backtest Result",
                 style=dict(
-                        width='200%',
-                        verticalAlign="left"),
+                    width='200%',
+                    verticalAlign="left"),
                 className="dash-bootstrap"
-            ), style={"width": "200%"},)
+            ), style={"width": "200%"}, )
         ],
         brand="Backtesting Platform",
         brand_href="https://localhost:5000/welcome",
