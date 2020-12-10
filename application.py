@@ -490,7 +490,9 @@ def all_strategy(page_num):
     username = current_user.username
 
     strategies = Strategies.query.filter_by(
-        user_id=current_user_id).order_by(Strategies.last_modified_date.desc()).paginate(per_page=5, page=page_num, error_out=True)
+        user_id=current_user_id).order_by(
+        Strategies.last_modified_date.desc()
+    ).paginate(per_page=5, page=page_num, error_out=True)
 
     return render_template(
         'strategies.html',
@@ -1182,6 +1184,7 @@ class StrategiesModelView(ModelView):
     """
     Strategies view
     """
+
     def is_accessible(self):
         """
         check if user can access admin page
