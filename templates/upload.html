@@ -1,6 +1,12 @@
 {% extends "layout.html" %}
 {% block content %}
-<h1>Upload Your Files Here</h1>
+
+<br></br><br></br>
+
+
+<h4>Upload Your Files Here</h4>
+
+<br></br>
 
 <form name="post" action="/upload" method="POST" onsubmit="return modal_trigger()" enctype="multipart/form-data">
 
@@ -41,7 +47,7 @@
 
 <br></br>
 
-<form action="/strategies" method="GET" enctype="multipart/form-data">
+<form action="/strategies/1" method="GET" enctype="multipart/form-data">
     <button id="GoToStrategies" type="submit" class="btn btn-primary">All Strategies</button>
 </form>
 

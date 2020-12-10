@@ -195,9 +195,9 @@ def test_update_fig():
     _, strategy_id = before_test()
     location_df = rds.get_all_locations([strategy_id])
     location = location_df['pnl_location'].iloc[0]
-    fig1, fig2, fig3, fig4 = app.fig_update(location)
+    fig1, fig2, fig3, fig4, fig5 = app.fig_update(location)
     assert type(fig1) == type(go.Figure()) and type(fig2) == type(go.Figure()) \
-           and type(fig3) == type(go.Figure()) and isinstance(fig4, pd.DataFrame)
+           and type(fig3) == type(go.Figure()) and isinstance(fig4, pd.DataFrame) and type(fig5) == type(go.Figure())
 
 
 def test_update_fig_invalid():
@@ -205,8 +205,8 @@ def test_update_fig_invalid():
     Test if fig_update() will return four None graphs by giving None for the path.
     :return:
     """
-    fig1, fig2, fig3, fig4 = app.fig_update(None)
-    assert not fig1 and not fig2 and not fig3 and not fig4
+    fig1, fig2, fig3, fig4, fig5 = app.fig_update(None)
+    assert not fig1 and not fig2 and not fig3 and not fig4 and not fig5
 
 
 def test_get_plot():

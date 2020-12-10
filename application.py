@@ -22,7 +22,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
-import timeago
 from PIL import Image
 from dash import Dash
 from dash.dependencies import Input, Output
@@ -30,6 +29,7 @@ from dash.exceptions import PreventUpdate
 from flask import Flask, flash, redirect, url_for
 from flask import render_template
 from flask import request
+from flask import send_from_directory
 from flask_admin import Admin, BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask_bcrypt import Bcrypt
@@ -50,7 +50,7 @@ from werkzeug.serving import run_simple
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, \
     ValidationError
-
+from flask_moment import Moment
 from errors.handlers import errors
 from user import OAuthUser
 from utils import s3_util, rds
@@ -64,6 +64,7 @@ logger.setLevel(logging.DEBUG)
 
 application = Flask(__name__)
 
+moment = Moment(application)
 application.config.from_object("config")
 
 db = SQLAlchemy(application)
@@ -97,6 +98,10 @@ TOTAL_CAPITAL = 10 ** 6
 
 
 # endpoint routes
+@application.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
 @application.route("/OAuth_login")
@@ -465,9 +470,9 @@ def account():
                            image_file=image_file, form=form)
 
 
-@application.route('/strategies')
+@application.route('/strategies/<int:page_num>')
 @login_required
-def all_strategy():
+def all_strategy(page_num):
     """display all user strategy as a table on the U.I.
 
     Returns:
@@ -488,13 +493,15 @@ def all_strategy():
         current_user.username = str(user_name['username'].iloc[0])
     current_user_id = current_user.id
     username = current_user.username
-    all_user_strategies = get_user_strategies(current_user_id)
 
-    all_user_strategies['last_modified_date'] = all_user_strategies['last_modified_date'].apply(
-        lambda d: timeago.format(d, datetime.datetime.utcnow()))
+    strategies = Strategies.query.filter_by(
+        user_id=current_user_id).order_by(
+        Strategies.last_modified_date.desc()
+    ).paginate(per_page=5, page=page_num, error_out=True)
+
     return render_template(
         'strategies.html',
-        df=all_user_strategies,
+        df=strategies,
         username=username
     )
 
@@ -560,8 +567,8 @@ def delete_strategy():
     strategy_id = request.args.get('id')
     strategy_location = get_strategy_location(strategy_id)
 
-    delete_strategy_by_user(strategy_location)
-    return redirect('strategies')
+    delete_strategy_by_user(strategy_location, strategy_id)
+    return redirect('strategies/1')
 
 
 @application.route('/log_strategy')
@@ -971,7 +978,7 @@ def upload_strategy_to_s3(
     return "{}{}".format(application.config["S3_LOCATION"], upload_path)
 
 
-def delete_strategy_by_user(filepath):
+def delete_strategy_by_user(filepath, strategy_id=None):
     """delete a strategy
 
     Args:
@@ -980,8 +987,10 @@ def delete_strategy_by_user(filepath):
 
     ASSUME THE FILEPATH is always valid
     NOTE: Need to delete both s3 and database
+    :param strategy_id: default None
     """
-    conn = rds.get_connection()
+    logger.info(f"*****{filepath}\n\n")
+
     bucket_name = application.config["S3_BUCKET"]
     split_path = filepath.split('/')
     prefix = "/".join(split_path[3:])
@@ -990,18 +999,29 @@ def delete_strategy_by_user(filepath):
         Bucket=bucket_name, Prefix=prefix
     )
     object_cnt = response["KeyCount"]
-    s3_object = response['Contents'][0]  # assume only one match
-    logger.info("affected objects = %d", object_cnt)
-    logger.info("Delete file from AWS")
-    s3_client.delete_object(Bucket=bucket_name, Key=s3_object['Key'])
-    logger.info("Delete file from AWS")
+    conn = rds.get_connection()
     cursor = conn.cursor()
-    query = "DELETE FROM backtest.strategies \
-                WHERE strategy_location = %s"
-    cursor.execute(query, (filepath,))
-    conn.commit()
-    logger.info("affected rows = %d", cursor.rowcount)
-    logger.info("Delete file from Database")
+    delete_strategy_qry = "DELETE FROM backtest.strategies \
+                 WHERE strategy_location = %s"
+    delete_backtest_qry = f"DELETE FROM backtest.backtests \
+                 WHERE strategy_id = {int(strategy_id)}" if strategy_id else "SELECT @@VERSION;"
+    if object_cnt == 0:
+        cursor.execute(delete_backtest_qry)
+        cursor.execute(delete_strategy_qry, (filepath,))
+        conn.commit()
+        logger.info("affected rows = %d", cursor.rowcount)
+        logger.info("Delete file from Database")
+    else:
+        s3_object = response['Contents'][0]  # assume only one match
+        logger.info("affected objects = %d", object_cnt)
+        logger.info("Delete file from AWS")
+        s3_client.delete_object(Bucket=bucket_name, Key=s3_object['Key'])
+        logger.info("Delete file from AWS")
+        cursor.execute(delete_backtest_qry)
+        cursor.execute(delete_strategy_qry, (filepath,))
+        conn.commit()
+        logger.info("affected rows = %d", cursor.rowcount)
+        logger.info("Delete file from Database")
 
 
 def clean_pylint_output(pylint_message):
@@ -1046,6 +1066,7 @@ class RegistrationForm(FlaskForm):
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(),
                                                                      EqualTo('password')])
     submit = SubmitField('Sign Up')
+
     def validate_password(self, password):
         """
         check if password is in valid format
@@ -1080,8 +1101,6 @@ class RegistrationForm(FlaskForm):
         user = User.query.filter_by(email=email.data).first()
         if user:
             raise ValidationError('That email is taken. Please choose a different one.')
-
-
 
 
 class LoginForm(FlaskForm):
@@ -1168,7 +1187,38 @@ class ResetPasswordForm(FlaskForm):
     submit = SubmitField('Reset Password')
 
 
-# User object
+# Database Related Objects
+
+class Strategies(db.Model):
+    user_id = db.Column(db.DECIMAL(25))
+    strategy_location = db.Column(db.VARCHAR(1024))
+    strategy_id = db.Column(db.Integer, primary_key=True)
+    last_modified_date = db.Column(db.DATETIME)
+    last_modified_user = db.Column(db.VARCHAR(32))
+    strategy_name = db.Column(db.VARCHAR(64))
+
+
+class StrategiesModelView(ModelView):
+    """
+    Strategies view
+    """
+
+    def is_accessible(self):
+        """
+        check if user can access admin page
+        :return: admin user redirect to admin page
+        """
+        return current_user.is_authenticated and current_user.user_type == "admin"
+
+    def inaccessible_callback(self, name, **kwargs):
+        """
+        return 403 page if not access admin page
+        :param name:
+        :param kwargs:
+        :return: 403 error page
+        """
+        return self.render('errors/308.html')
+
 
 class User(db.Model, UserMixin):
     """User object
@@ -1279,6 +1329,7 @@ class HomePageView(BaseView):
 admin = Admin(application)
 admin.add_view(HomePageView(name='Backtesting Platform', endpoint='home'))
 admin.add_view(UserModelView(User, db.session))
+admin.add_view(StrategiesModelView(Strategies, db.session))
 
 
 # dash part
@@ -1286,10 +1337,10 @@ def fig_update(file_path):
     """
     Given the file path, return an updated fig graph to display.
     :param file_path: string, to get csv file.
-    :return: fig, the styled graph.
+    :return: figs, the styled graph.
     """
 
-    cr_fig, sr_rolling, pnl_hist, pnl_df = None, None, None, None
+    cr_fig, sr_rolling, pnl_hist, pnl_df, fig_3d = None, None, None, None, None
     logger.info(file_path)
     if file_path is not None:
         split_path = file_path.split('/')
@@ -1314,6 +1365,17 @@ def fig_update(file_path):
                 ])
             )
         )
+        # 3d plot
+        another_df = pd.DataFrame()
+        another_df['normalized_pnl'] = pnl_df['pnl'].div(TOTAL_CAPITAL)
+        another_df['date'] = pnl_df['date']
+        another_df['rolling_risk'] = pnl_df['pnl'].iloc[1:].div(TOTAL_CAPITAL).rolling(3).std()
+        another_df = another_df[another_df['rolling_risk'] < 30]
+        risk_list = another_df['rolling_risk'].tolist()
+
+        another_df['color'] = np.asarray([int(num) for num in risk_list])
+        fig_3d = px.scatter_3d(another_df, x='date', y='rolling_risk', z='normalized_pnl',
+                               color = 'color', width=800, height=800, opacity=0.7)
 
         # Rolling sharpe ratio plot
         pnl_df['rolling_SR'] = pnl_df.pnl.rolling(180).apply(lambda x: (x.mean() - 0.02) / x.std(), raw=True)
@@ -1353,11 +1415,10 @@ def fig_update(file_path):
                                   marker_color='lightslategrey',
                                   name='profit'))
 
-    return cr_fig, sr_rolling, pnl_hist, pnl_df
-
+    return cr_fig, sr_rolling, pnl_hist, pnl_df, fig_3d
 
 def new_plot():
-    LOGO = "/assets/Logo_Columbia.png"
+
     content_style = {
         "margin-left": "32rem",
         "margin-right": "2rem",
@@ -1368,7 +1429,7 @@ def new_plot():
         children=[
             dbc.NavItem(dbc.NavLink("Home", href="https://localhost:5000/upload"),
                         style=dict(width='200%'), className="ml-2"),
-            dbc.NavItem(dbc.NavLink("Strategies", href="https://localhost:5000/strategies"),
+            dbc.NavItem(dbc.NavLink("Strategies", href="https://localhost:5000/strategies/1"),
                         style=dict(width='200%'), className="ml-2"),
             html.Div(dcc.Dropdown(
                 id='backtest_result',
@@ -1400,6 +1461,21 @@ def new_plot():
                                 width={"size": 10, "offset": 2}),
                     ]
                 )
+
+            ],
+            style=content_style
+        ),
+
+        html.Div(
+            [
+                html.H2('3D View of Daily Change',
+                        style={'textAlign': 'center', 'font-family': 'Georgia'}),
+                html.Hr(),
+                dbc.Row(
+                    [
+                        dbc.Col(dcc.Graph(id='fig_3d'),
+                                width={"size": 10, "offset": 2}),
+                    ] )
 
             ],
             style=content_style
@@ -1442,6 +1518,7 @@ def new_plot():
 
 @dash_app.callback(
     Output('pnl_fig', 'figure'),
+    Output('fig_3d', 'figure'),
     Output('sr_rolling', 'figure'),
     Output('pnl_hist', 'figure'),
     Output('table', 'children'),
@@ -1463,7 +1540,7 @@ def update_graph(backtest_fp):
     }
     if backtest_fp is not None:
 
-        pnl_fig, sr_rolling, pnl_hist, pnl_df = fig_update(backtest_fp)
+        pnl_fig, sr_rolling, pnl_hist, pnl_df, fig_3d = fig_update(backtest_fp)
         table_df = pnl_summary(pnl_df)
         table_comp = html.Div(
             [
@@ -1505,7 +1582,7 @@ def update_graph(backtest_fp):
                 ),
             ], style=table_style
         )
-        return pnl_fig, sr_rolling, pnl_hist, table_comp
+        return pnl_fig, fig_3d, sr_rolling, pnl_hist, table_comp
 
     else:
         raise PreventUpdate
