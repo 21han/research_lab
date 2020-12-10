@@ -26,17 +26,17 @@
         </tr>
         </thead>
         <tbody>
-        {% for i,value in df.iterrows() %}
+        {% for s in df.items %}
         <tr>
             <th scope="row">{{i}}</th>
-            <td>{{value['strategy_name']}}</td>
-            <td>{{value['last_modified_date']}}</td>
-            <td>{{value['last_modified_user']}}</td>
+            <td>{{s.strategy_name}}</td>
+            <td>{{moment(s.last_modified_date).fromNow(refresh=True)}}</td>
+            <td>{{s.last_modified_user}}</td>
             <td>
-                <button id="strategyButton" onclick="strategyButtonFunc({{value['strategy_id']}})" type="button"
+                <button id="strategyButton" onclick="strategyButtonFunc({{s.strategy_id}})" type="button"
                         class="btn btn-primary">Backtest
                 </button>
-                <button id="deleteStrategy" onclick="deleteStrategy({{value['strategy_id']}})" type="button"
+                <button id="deleteStrategy" onclick="deleteStrategy({{s.strategy_id}})" type="button"
                         class="btn btn btn-danger">X
                 </button>
             </td>
@@ -46,57 +46,45 @@
         </tbody>
     </table>
 
+    <ul class="pagination">
+        {% if df.has_prev %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('all_strategy', page_num=df.prev_num) }}">Previous</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Previous</span>
+            {% endif %}
+        </li>
+
+        {% for page in df.iter_pages(left_edge=3, right_edge=3) %}
+        {% if page %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('all_strategy', page_num=page) }}">{{ page }}</a></li>
+        {% else %}
+        <li class="page-item disabled" id="example_ellipsis"><a href="#" class="page-link">…</a></li>
+        {% endif %}
+        {% endfor %}
+
+        {% if df.has_next %}
+        <li class="page-item"><a class="page-link"
+                                 href="{{ url_for('all_strategy', page_num=df.next_num) }}">Next</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Next</span>
+            {% endif %}
+    </ul>
+
     <br></br>
 
     <form action="/upload" method="GET" enctype="multipart/form-data">
-        <button id="GoToHome" type="submit" class="btn btn-success">&#9194; Upload Strategies</button>
+        <button id="GoToHome" type="submit" class="btn btn-primary">
+            Upload Strategies
+        </button>
     </form>
 
     <br></br>
 
     <form action="/results" method="GET" enctype="multipart/form-data">
-        <button id="GoToResults" type="submit" class="btn btn-success">&#9193; View Results</button>
+        <button id="GoToResults" type="submit" class="btn btn-primary">View Results</button>
     </form>
 </div>
 
-
-<script>
-    function strategyButtonFunc(strategyId) {
-        window.open(
-            '/strategy?id=' + Number(strategyId),
-            '_blank' // <- This is what makes it open in a new window.
-        );
-    };
-
-    function deleteStrategy(strategyId) {
-        const path = '/strategy?id=' + Number(strategyId);
-        params = {};
-        post(path, params);
-    };
-
-    function post(path, params, method = 'post') {
-
-        // The rest of this code assumes you are not using a library.
-        // It can be made less wordy if you use one.
-        const form = document.createElement('form');
-        form.method = method;
-        form.action = path;
-
-        for (const key in params) {
-            if (params.hasOwnProperty(key)) {
-                const hiddenField = document.createElement('input');
-                hiddenField.type = 'hidden';
-                hiddenField.name = key;
-                hiddenField.value = params[key];
-
-                form.appendChild(hiddenField);
-            }
-        }
-
-        document.body.appendChild(form);
-        form.submit();
-    };
-
-</script>
 
 {% endblock content %}
