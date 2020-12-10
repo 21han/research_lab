@@ -1286,10 +1286,10 @@ def fig_update(file_path):
     """
     Given the file path, return an updated fig graph to display.
     :param file_path: string, to get csv file.
-    :return: fig, the styled graph.
+    :return: figs, the styled graph.
     """
 
-    cr_fig, sr_rolling, pnl_hist, pnl_df = None, None, None, None
+    cr_fig, sr_rolling, pnl_hist, pnl_df, fig_3d = None, None, None, None, None
     logger.info(file_path)
     if file_path is not None:
         split_path = file_path.split('/')
@@ -1314,6 +1314,17 @@ def fig_update(file_path):
                 ])
             )
         )
+        # 3d plot
+        another_df = pd.DataFrame()
+        another_df['normalized_pnl'] = pnl_df['pnl'].div(TOTAL_CAPITAL)
+        another_df['date'] = pnl_df['date']
+        another_df['rolling_risk'] = pnl_df['pnl'].iloc[1:].div(TOTAL_CAPITAL).rolling(3).std()
+        another_df = another_df[another_df['rolling_risk'] < 30]
+        risk_list = another_df['rolling_risk'].tolist()
+
+        another_df['color'] = np.asarray([int(num) for num in risk_list])
+        fig_3d = px.scatter_3d(another_df, x='date', y='rolling_risk', z='normalized_pnl',
+                               color = 'color', width=800, height=800, opacity=0.7)
 
         # Rolling sharpe ratio plot
         pnl_df['rolling_SR'] = pnl_df.pnl.rolling(180).apply(lambda x: (x.mean() - 0.02) / x.std(), raw=True)
@@ -1353,11 +1364,10 @@ def fig_update(file_path):
                                   marker_color='lightslategrey',
                                   name='profit'))
 
-    return cr_fig, sr_rolling, pnl_hist, pnl_df
-
+    return cr_fig, sr_rolling, pnl_hist, pnl_df, fig_3d
 
 def new_plot():
-    LOGO = "/assets/Logo_Columbia.png"
+
     content_style = {
         "margin-left": "32rem",
         "margin-right": "2rem",
@@ -1407,6 +1417,21 @@ def new_plot():
 
         html.Div(
             [
+                html.H2('3D View of Daily Change',
+                        style={'textAlign': 'center', 'font-family': 'Georgia'}),
+                html.Hr(),
+                dbc.Row(
+                    [
+                        dbc.Col(dcc.Graph(id='fig_3d'),
+                                width={"size": 10, "offset": 2}),
+                    ] )
+
+            ],
+            style=content_style
+        ),
+
+        html.Div(
+            [
                 html.H2('Rolling Sharpe Ratio (6-months)',
                         style={'textAlign': 'center', 'font-family': 'Georgia'}),
                 html.Hr(),
@@ -1442,6 +1467,7 @@ def new_plot():
 
 @dash_app.callback(
     Output('pnl_fig', 'figure'),
+    Output('fig_3d', 'figure'),
     Output('sr_rolling', 'figure'),
     Output('pnl_hist', 'figure'),
     Output('table', 'children'),
@@ -1463,7 +1489,7 @@ def update_graph(backtest_fp):
     }
     if backtest_fp is not None:
 
-        pnl_fig, sr_rolling, pnl_hist, pnl_df = fig_update(backtest_fp)
+        pnl_fig, sr_rolling, pnl_hist, pnl_df, fig_3d = fig_update(backtest_fp)
         table_df = pnl_summary(pnl_df)
         table_comp = html.Div(
             [
@@ -1505,7 +1531,7 @@ def update_graph(backtest_fp):
                 ),
             ], style=table_style
         )
-        return pnl_fig, sr_rolling, pnl_hist, table_comp
+        return pnl_fig, fig_3d, sr_rolling, pnl_hist, table_comp
 
     else:
         raise PreventUpdate
