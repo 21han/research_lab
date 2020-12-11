@@ -88,7 +88,7 @@ migrate = Migrate(application, db)
 
 # dash object
 dash_app = Dash(__name__, server=application, external_stylesheets=[dbc.themes.BOOTSTRAP],
-                url_base_pathname='/dash_plots/')
+                url_base_pathname='/dash_plots/', suppress_callback_exceptions=True)
 dash_app.validation_layout = True
 dash_app._layout = html.Div()
 # global variables for update dash dynamically depending on different user
