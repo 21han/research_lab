@@ -31,6 +31,15 @@
       "contributions": [
         "bug"
       ]
+    },
+    {
+      "login": "gzhami",
+      "name": "Zihan Guo",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/22876277?v=4",
+      "profile": "https://www.linkedin.com/in/zihan-guo/",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
